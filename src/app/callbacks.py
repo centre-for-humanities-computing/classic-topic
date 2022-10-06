@@ -3,7 +3,6 @@ from typing import Callable, Dict, Tuple
 import dash
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from app import styles
 
 from app.utils.modelling import (
     calculate_importance,
@@ -11,6 +10,9 @@ from app.utils.modelling import (
     fit_pipeline,
     load_corpus,
 )
+
+from app.components.sidebar import sidebar_body_class
+from app.components.topic_switcher import topic_switcher_class
 
 callbacks = []
 
@@ -77,17 +79,6 @@ def update_fit(
 
 
 @cb(
-    Output("topic_switcher", "style"),
-    Input("fit_store", "data"),
-)
-def hide_topic_switcher(data):
-    if data is None:
-        return styles.invisible
-    else:
-        return styles.topic_switcher
-
-
-@cb(
     Output("next_topic", "children"),
     Output("next_topic", "disabled"),
     Output("prev_topic", "children"),
@@ -112,15 +103,20 @@ def update_topic_switcher(topic_names, current_topic):
 
 
 @cb(
-    Output("sidebar", "style"),
-    Output("sidebar_body", "style"),
-    Output("sidebar_collapser", "children"),
+    Output("sidebar_body", "className"),
+    Output("topic_switcher", "className"),
     Input("sidebar_collapser", "n_clicks"),
     prevent_initial_call=True,
 )
 def open_close_sidebar(n_clicks: int):
-    is_open = (n_clicks % 2) == 1
+    is_open = (n_clicks % 2) == 0
     if is_open:
-        return (styles.sidebar_collapsed, styles.invisible, "<")
+        return (
+            sidebar_body_class + " translate-x-full",
+            topic_switcher_class + " -translate-x-1/2",
+        )
     else:
-        return (styles.sidebar, styles.sidebar_body, ">")
+        return (
+            sidebar_body_class + " translate-x-0",
+            topic_switcher_class + " -translate-x-2/3",
+        )

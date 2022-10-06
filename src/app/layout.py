@@ -2,43 +2,18 @@
 import dash
 from dash import dcc, html
 
-import app.styles as styles
-
-from app import components
-
+from app.components.topic_switcher import topic_switcher
+from app.components.sidebar import sidebar
 
 layout = html.Div(
-    style=styles.window,
+    className="flex flex-row w-full h-full fixed",
     children=[
         dcc.Store(id="fit_store", storage_type="local"),
         dcc.Store(id="topic_names", storage_type="local"),
         dcc.Store(id="current_topic", storage_type="local"),
-        html.Div(
-            style={
-                **styles.page_visible,
-                "display": "flex",
-                "flex-direction": "column",
-            },
-            children=[
-                html.Div(
-                    id="plot_container",
-                    style={
-                        "display": "flex",
-                        "flex": "15 0",
-                    },
-                    children=dcc.Graph(
-                        id="plot_space",
-                        style={"height": "100%", "width": "100%"},
-                    ),
-                ),
-                components.topic_switcher,
-            ],
-        ),
-        html.Div(
-            id="sidebar",
-            style=styles.sidebar,
-            children=[components.sidebar_collapser, components.sidebar_body],
-        ),
+        dcc.Graph(id="main_plot", className="flex-1 mr-16 z-0"),
+        topic_switcher,
+        sidebar,
     ],
 )
 

@@ -2,7 +2,11 @@ import dash
 from app.callbacks import add_callbacks
 from app.layout import add_layout
 
-app = dash.Dash(__name__, title="Topic Modelling")
+app = dash.Dash(
+    __name__,
+    title="Topic Modelling",
+    external_scripts=[{"src": "https://cdn.tailwindcss.com"}],
+)
 
 add_layout(app)
 add_callbacks(app)
