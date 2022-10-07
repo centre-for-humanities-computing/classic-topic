@@ -37,7 +37,7 @@ sidebar = html.Div(
         ),
         html.Div(
             id="sidebar_body",
-            className=sidebar_body_class + " translate-x-full",
+            className=sidebar_body_class + " translate-x-0",
             children=[
                 html.H1(
                     "Pipeline Settings ⚙️",

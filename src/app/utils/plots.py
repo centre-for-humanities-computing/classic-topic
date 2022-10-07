@@ -56,14 +56,16 @@ def word_plot(topic: int, top_words: pd.DataFrame) -> go.Bar:
     )
 
 
-def join_plots(row: pd.Series) -> go.Figure:
+def join_plots(genre_fig: go.Pie, word_fig: go.Bar) -> go.Figure:
     """Joins the plots together in one row of the data frame.
 
     Parameters
     ----------
-    row: Series
-        Series representing one row of a dataframe containing
-        the index of the topic, a bar chart and a pie chart.
+    genre_fig: Figure
+        Piechart trace visualizing the relevance of
+        different genres for a topic.
+    word_fig: Figure
+        Bar chart visualizing the top words for a topic.
 
     Returns
     -------
@@ -78,11 +80,9 @@ def join_plots(row: pd.Series) -> go.Figure:
         cols=2,
         subplot_titles=("Most relevant genres", "Most relevant words"),
     )
-    fig.add_trace(row.genre_fig, row=1, col=1)
-    fig.add_trace(row.word_fig, row=1, col=2)
+    fig.add_trace(genre_fig, row=1, col=1)
+    fig.add_trace(word_fig, row=1, col=2)
     fig.update_layout(
         yaxis=dict(autorange="reversed"),
-        height=900,
-        title_text=f"Topic {row.topic}",
     )
     return fig

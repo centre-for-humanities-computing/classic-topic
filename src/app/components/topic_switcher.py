@@ -12,7 +12,7 @@ topic_switcher_class = """
 
 topic_switcher = html.Div(
     id="topic_switcher",
-    className=topic_switcher_class + " -translate-x-1/2",
+    className=topic_switcher_class + " -translate-x-2/3",
     children=[
         html.Button(
             "<- Previous topic",
