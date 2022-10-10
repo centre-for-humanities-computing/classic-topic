@@ -1,5 +1,7 @@
+"""Module containing all the callbacks of the application"""
+import base64
 import json
-from typing import Any, Callable, Dict, Hashable, List, Tuple, TypeVar
+from typing import Callable, Dict, List, Tuple, TypeVar
 
 import dash
 import pandas as pd
@@ -19,20 +21,20 @@ from app.utils.modelling import (
     calculate_topic_data,
     fit_pipeline,
     load_corpus,
+    serialize_save_data,
 )
 from app.utils.plots import all_topics_plot, documents_plot, topic_plot
 
+# Global callback list
 callbacks = []
 
 T = TypeVar("T")
 
 Wrapped = Dict[str, T]
 
-DictFrame = Dict[Hashable, Any]
-
 
 def cb(*args, **kwargs) -> Callable:
-    """Decorator to add function to the global callback list"""
+    """Decorator to add a function to the global callback list"""
 
     def _cb(func: Callable):
         callbacks.append({"function": func, "args": args, "kwargs": kwargs})
@@ -58,6 +60,7 @@ def add_callbacks(app: dash.Dash) -> None:
     State("max_df", "value"),
     State("select_model", "value"),
     State("n_topics", "value"),
+    Input("upload", "contents"),
     prevent_initial_call=True,
 )
 def update_fit(
@@ -67,10 +70,49 @@ def update_fit(
     max_df: float,
     model_name: str,
     n_topics: int,
+    upload_contents: List,
 ) -> Tuple[Dict, List]:
+    """Updates fit data in the local store when the fit model button is pressed.
+
+    Parameters
+    ----------
+    n_clicks: int
+        Number of times the 'fit_pipeline' button has been pressed.
+    vectorizer_name: {'tf-idf', 'bow'}
+        Describes whether a TF-IDF of Bag of Words vectorizer should be fitted.
+    min_df: int
+        Minimum document frequency parameter of the vectorizer.
+    max_df: float
+        Minimum document frequency parameter of the vectorizer.
+    model_name: {'nmf', 'lda', 'lsa'/'lsi', 'dmm'}
+        Specifies which topic model should be trained on the corpus.
+    n_topics: int
+        Number of topics the model should find.
+
+    Returns
+    -------
+    fit_store.data: dict
+        Data about the model fit.
+    loading.children: list
+        Empty list, is returned so that the loading component activates
+        while the callback is executed.
+    """
+    if ctx.triggered_id == "upload":
+        if not upload_contents:
+            raise PreventUpdate()
+        # If the data has been uploaded, parse contents and return them
+        _, content_string = upload_contents.split(",")
+        # Decoding data
+        decoded = base64.b64decode(content_string)
+        text = decoded.decode("utf-8")
+        data = json.loads(text)
+        return data["fit_data"], []
+    # If the button has not actually been clicked prevent updating
     if not n_clicks:
         raise PreventUpdate
+    # Load the corpus from disk
     corpus = load_corpus()
+    # Fitting the topic pipeline
     pipeline = fit_pipeline(
         corpus=corpus,
         vectorizer_name=vectorizer_name,
@@ -79,6 +121,7 @@ def update_fit(
         model_name=model_name,
         n_topics=n_topics,
     )
+    # Inferring data from the fit
     genre_importance = calculate_genre_importance(corpus, pipeline)
     top_words = calculate_top_words(pipeline, top_n=30)
     topic_data = calculate_topic_data(corpus, pipeline)
@@ -90,6 +133,7 @@ def update_fit(
             "topic_data": topic_data.to_dict(),
             "document_data": document_data.to_dict(),
             "n_topics": n_topics,
+            "loaded": False,
         },
         [],
     )
@@ -108,6 +152,28 @@ def update_fit(
 def update_topic_switcher(
     topic_names_data: Wrapped[List[str]], current_topic_data: Wrapped[int]
 ):
+    """Updates the topic switcher component when the current topic changes.
+
+    Parameters
+    ----------
+    topic_names_data: wrapped list of str
+        Store data about topic names.
+    current_topic_data: wrapped int
+        Store data about currently selected topic.
+
+    Returns
+    -------
+    next_topic.children
+        Text that should be displayed on the next topic button.
+    next_topic.disabled
+        Whether the next topic button should be disabled or not.
+    prev_topic.children
+        Text that should be displayed on the previous topic button.
+    prev_topic.disabled
+        Whether the previous topic button should be disabled or not.
+    topic_name.value
+        List of topic names.
+    """
     if topic_names_data is None or current_topic_data is None:
         raise PreventUpdate
     topic_names = topic_names_data["topic_names"]
@@ -131,6 +197,7 @@ def update_topic_switcher(
     State("current_topic", "data"),
     Input("topic_name", "value"),
     Input("fit_store", "data"),
+    Input("upload", "contents"),
     prevent_initial_call=True,
 )
 def update_topic_names(
@@ -138,19 +205,55 @@ def update_topic_names(
     current_topic_data: Wrapped[int],
     topic_name: str,
     fit_store: Dict,
+    upload_contents: List,
 ) -> Wrapped[List[str]]:
-    if ctx.triggered_id == "fit_store":
-        if fit_store is None:
+    """
+    Updates topic names when the current topic name is changed or when a new model is fitted.
+
+    Parameters
+    ----------
+    topic_names_data: wrapped list of str
+        Store data of topic names.
+    current_topic_data: wrapped int
+        Store data of current topic.
+    topic_name: str
+        Current value of the topic name entry component.
+    fit_store: dict
+        Data about the model fit.
+
+    Returns
+    -------
+    topic_names.data
+        List of topic names.
+    """
+    if ctx.triggered_id == "upload":
+        if not upload_contents:
             raise PreventUpdate()
+        # If the data has been uploaded, parse contents and return them
+        _, content_string = upload_contents.split(",")
+        # Decoding data
+        decoded = base64.b64decode(content_string)
+        text = decoded.decode("utf-8")
+        data = json.loads(text)
+        return data["topic_names"]
+    # Check if the callback has been triggered by the fit updating.
+    if ctx.triggered_id == "fit_store":
+        # If the store is empty prevent updating.
+        if fit_store is None or fit_store["loaded"]:
+            raise PreventUpdate()
+        # Return a list of default topic names.
         return {
             "topic_names": [f"Topic {i}" for i in range(fit_store["n_topics"])]
         }
+    # If there is no topic names data prevent updating.
     if topic_names_data is None or current_topic_data is None:
         raise PreventUpdate()
+    # Unwrapping data
     topic_names = topic_names_data["topic_names"]
     current_topic = current_topic_data["current_topic"]
     if not topic_names:
         raise PreventUpdate()
+    # Creating a list of new names
     new_names = topic_names.copy()
     new_names[current_topic] = topic_name
     return {"topic_names": new_names}
@@ -167,6 +270,24 @@ def update_topic_names(
 def open_close_sidebar(
     n_clicks: int, current_view_data: Wrapped[str]
 ) -> Tuple[str, str, str]:
+    """Opens or closes sidebar and moves and hides the topic switcher.
+
+    Parameters
+    ----------
+    n_clicks: int
+        Number of times the sidebar collapse button has been clicked
+    current_view_data: wrapped int
+        Data about the current view.
+
+    Returns
+    -------
+    sidebar_body.className: str
+        Indicates style and position of the sidebar body.
+    topic_switcher.className: str
+        Describes position and style for the topic switcher.
+    sidebar_collapser.children: str
+        The sidebar collapser button icon.
+    """
     if n_clicks is None or current_view_data is None:
         raise PreventUpdate()
     view = current_view_data["current_view"]
@@ -196,6 +317,7 @@ def open_close_sidebar(
 def open_close_sidebar_fitting(
     current: int, fit_data: Dict, n_clicks: int
 ) -> int:
+    """Opens or closes sidebar when the fit pipeline button is pressed."""
     if ((ctx.triggered_id == "fit_store") and (fit_data is None)) or (
         (ctx.triggered_id == "fit_pipeline") and n_clicks
     ):
@@ -213,6 +335,7 @@ def open_close_sidebar_fitting(
 def update_current_view(
     topic_clicks: int, document_clicks: int
 ) -> Wrapped[str]:
+    """Updates the current view value in store when a view is selected on the navbar."""
     if not topic_clicks and not document_clicks:
         raise PreventUpdate()
     if ctx.triggered_id == "topic_view_button":
@@ -231,6 +354,7 @@ def update_current_view(
     prevent_initial_call=True,
 )
 def switch_views(current_view_data: Wrapped[str]) -> Tuple[str, str, str, str]:
+    """Switches views when the current view value in the store is changed."""
     if not current_view_data or "current_view" not in current_view_data:
         raise PreventUpdate()
     view = current_view_data["current_view"]
@@ -267,6 +391,7 @@ def update_current_topic(
     prev_clicks: int,
     plot_click_data: Dict,
 ) -> Wrapped[int]:
+    """Updates current topic in the store when one is selected."""
     if "fit_store" == ctx.triggered_id:
         return {"current_topic": 0}
     if current_topic_data is None or "current_topic" not in current_topic_data:
@@ -275,6 +400,8 @@ def update_current_topic(
     if "all_topics_plot" == ctx.triggered_id:
         if plot_click_data is None:
             raise PreventUpdate()
+        # In theory multiple points could be selected with
+        # multiple customdata elements, so we unpack the first element.
         point, *_ = plot_click_data["points"]
         topic_id, *_ = point["customdata"]
         return {"current_topic": topic_id}
@@ -297,6 +424,9 @@ def update_current_topic(
 def update_current_topic_plot(
     current_topic_data: Wrapped[int], fit_store: Dict
 ) -> go.Figure:
+    """Updates the plots about the current topic in the topic view
+    when the current topic is changed or when a new model is fitted.
+    """
     if current_topic_data is None or fit_store is None:
         raise PreventUpdate()
     current_topic = current_topic_data["current_topic"]
@@ -319,6 +449,7 @@ def update_all_topics_plot(
     topic_names_data: Wrapped[List[str]],
     current_topic_data: Wrapped[int],
 ) -> go.Figure:
+    """Updates the topic overview plot when the fit, the topic names or the current topic change."""
     if (
         fit_data is None
         or topic_names_data is None
@@ -327,9 +458,12 @@ def update_all_topics_plot(
         or ("topic_names" not in topic_names_data)
         or ("current_topic" not in current_topic_data)
     ):
+        # If there's missing data, prevent update.
         raise PreventUpdate()
     topic_data = pd.DataFrame(fit_data["topic_data"])
     current_topic = current_topic_data["current_topic"]
+    # Mapping topic names over to topic ids with a Series
+    # since Series also function as a mapping, you can use them in the .map() method
     names = pd.Series(topic_names_data["topic_names"])
     topic_data = topic_data.assign(topic_name=topic_data.topic_id.map(names))
     fig = all_topics_plot(topic_data, current_topic)
@@ -344,17 +478,41 @@ def update_all_topics_plot(
 def update_all_documents_plot(
     fit_data: Dict, topic_names_data: Wrapped[List[str]]
 ) -> go.Figure:
+    """Updates the document overview plot when a new model is fitted or when topic names are changed"""
     if (
         fit_data is None
         or topic_names_data is None
         or ("document_data" not in fit_data)
         or ("topic_names" not in topic_names_data)
     ):
+        # If there's missing data, prevent update.
         raise PreventUpdate()
     document_data = pd.DataFrame(fit_data["document_data"])
+    # Mapping topic names over to topic ids with a Series
+    # since Series also function as a mapping, you can use them in the .map() method
     names = pd.Series(topic_names_data["topic_names"])
     document_data = document_data.assign(
         topic_name=document_data.topic_id.map(names)
     )
     fig = documents_plot(document_data)
     return fig
+
+
+@cb(
+    Output("download", "data"),
+    Input("download_button", "n_clicks"),
+    State("fit_store", "data"),
+    State("topic_names", "data"),
+    prevent_initial_call=True,
+)
+def download_data(
+    n_clicks: int, fit_data: Dict, topic_names: Wrapped[str]
+) -> Dict:
+    if not n_clicks:
+        raise PreventUpdate()
+    if not fit_data or not topic_names:
+        raise PreventUpdate()
+    return {
+        "content": serialize_save_data(fit_data, topic_names),
+        "filename": "model_data.json",
+    }

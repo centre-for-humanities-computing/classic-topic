@@ -1,4 +1,5 @@
 # type: ignore
+"""Module describing the navigation bar component of the app."""
 from dash import dcc, html
 
 navbar_button_class = """

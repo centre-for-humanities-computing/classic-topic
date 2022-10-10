@@ -1,5 +1,6 @@
+"""Module containing plotting utilities."""
+
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
@@ -128,6 +129,18 @@ def all_topics_plot(topic_data: pd.DataFrame, current_topic: int) -> go.Figure:
 
 
 def documents_plot(document_data: pd.DataFrame) -> go.Figure:
+    """Plots all documents in 3D space, colors them according to dominant topic.
+
+    Parameters
+    ----------
+    document_data: DataFrame
+        Data about document position, topic and metadata.
+
+    Returns
+    -------
+    Figure
+        3D Scatter plot of all documents.
+    """
     fig = px.scatter_3d(
         document_data,
         x="x",

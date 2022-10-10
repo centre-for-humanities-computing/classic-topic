@@ -1,18 +1,21 @@
 # type: ignore
+"""Module describing the layout of the app"""
+
 import dash
 from dash import dcc, html
 
 from app.components.topic_switcher import topic_switcher
 from app.components.sidebar import sidebar
 from app.components.navbar import navbar
+from app.components.save_load import save_load
 
 view_class = "flex-row items-stretch flex-1 mr-16 z-0"
 
 layout = html.Div(
     className="flex flex-row w-full h-full fixed",
     children=[
-        dcc.Store(id="fit_store", storage_type="local"),
-        dcc.Store(id="topic_names", storage_type="local"),
+        dcc.Store(id="fit_store", storage_type="session"),
+        dcc.Store(id="topic_names", storage_type="session"),
         dcc.Store(id="current_topic", data={"current_topic": 0}),
         dcc.Store(
             id="current_view",
@@ -45,6 +48,7 @@ layout = html.Div(
         topic_switcher,
         sidebar,
         navbar,
+        save_load,
     ],
 )
 

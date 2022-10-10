@@ -1,3 +1,4 @@
+"""Main script creating the app, adding layout and callbacks and running the server"""
 import dash
 from app.callbacks import add_callbacks
 from app.layout import add_layout

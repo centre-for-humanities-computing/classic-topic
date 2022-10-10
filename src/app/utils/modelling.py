@@ -1,11 +1,15 @@
+"""Module for training topic pipelines and inferring data for plotting."""
+
+import json
+from typing import Dict, List
 import numpy as np
 import pandas as pd
-from app.utils.metadata import fetch_metadata
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.manifold import TSNE
 from sklearn.pipeline import Pipeline
 from tweetopic import DMM, TopicPipeline
+from app.utils.metadata import fetch_metadata
 
 # Mapping of names to topic models
 TOPIC_MODELS = {
@@ -24,6 +28,7 @@ VECTORIZERS = {
 
 
 def load_corpus() -> pd.DataFrame:
+    """Loads the corpus from disk."""
     return pd.read_csv("../dat/cleaned_corpus.csv")
 
 
@@ -35,6 +40,28 @@ def fit_pipeline(
     model_name: str,
     n_topics: int,
 ) -> TopicPipeline:
+    """Fits topic pipeline with the given parameters.
+
+    Parameters
+    ----------
+    corpus: DataFrame
+        Corpus data containing texts and ids.
+    vectorizer_name: {'tf-idf', 'bow'}
+        Describes whether a TF-IDF of Bag of Words vectorizer should be fitted.
+    min_df: int
+        Minimum document frequency parameter of the vectorizer.
+    max_df: float
+        Minimum document frequency parameter of the vectorizer.
+    model_name: {'nmf', 'lda', 'lsa'/'lsi', 'dmm'}
+        Specifies which topic model should be trained on the corpus.
+    n_topics: int
+        Number of topics the model should find.
+
+    Returns
+    -------
+    TopicPipeline
+        Fitted topic pipeline.
+    """
     topic_model = TOPIC_MODELS[model_name](n_components=n_topics)
     vectorizer = VECTORIZERS[vectorizer_name](min_df=min_df, max_df=max_df)
     pipeline = TopicPipeline(vectorizer=vectorizer, topic_model=topic_model)
@@ -221,3 +248,18 @@ def calculate_document_data(
     documents = documents.merge(md, on="id_nummer", how="inner")
     documents = documents.assign(group=documents.group.fillna(""))
     return documents
+
+
+def serialize_save_data(fit_data: Dict, topic_names: Dict) -> str:
+    """Serializes model fit and topic name data and turns it into JSON, so that it can be saved.
+
+    Parameters
+    ----------
+    fit_data: dict
+        Data about the model fit.
+    topic_names: wrapped list of str
+        Data about the topic names.
+    """
+    return json.dumps(
+        {"fit_data": {**fit_data, "loaded": True}, "topic_names": topic_names}
+    )
