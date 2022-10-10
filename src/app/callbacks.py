@@ -1,4 +1,6 @@
 """Module containing all the callbacks of the application"""
+import base64
+import json
 from typing import Callable, Dict, List, Tuple, TypeVar
 
 import dash
@@ -19,6 +21,7 @@ from app.utils.modelling import (
     calculate_topic_data,
     fit_pipeline,
     load_corpus,
+    serialize_save_data,
 )
 from app.utils.plots import all_topics_plot, documents_plot, topic_plot
 
@@ -57,6 +60,7 @@ def add_callbacks(app: dash.Dash) -> None:
     State("max_df", "value"),
     State("select_model", "value"),
     State("n_topics", "value"),
+    Input("upload", "contents"),
     prevent_initial_call=True,
 )
 def update_fit(
@@ -66,6 +70,7 @@ def update_fit(
     max_df: float,
     model_name: str,
     n_topics: int,
+    upload_contents: List,
 ) -> Tuple[Dict, List]:
     """Updates fit data in the local store when the fit model button is pressed.
 
@@ -92,6 +97,16 @@ def update_fit(
         Empty list, is returned so that the loading component activates
         while the callback is executed.
     """
+    if ctx.triggered_id == "upload":
+        if not upload_contents:
+            raise PreventUpdate()
+        # If the data has been uploaded, parse contents and return them
+        _, content_string = upload_contents.split(",")
+        # Decoding data
+        decoded = base64.b64decode(content_string)
+        text = decoded.decode("utf-8")
+        data = json.loads(text)
+        return data["fit_data"], []
     # If the button has not actually been clicked prevent updating
     if not n_clicks:
         raise PreventUpdate
@@ -118,6 +133,7 @@ def update_fit(
             "topic_data": topic_data.to_dict(),
             "document_data": document_data.to_dict(),
             "n_topics": n_topics,
+            "loaded": False,
         },
         [],
     )
@@ -181,6 +197,7 @@ def update_topic_switcher(
     State("current_topic", "data"),
     Input("topic_name", "value"),
     Input("fit_store", "data"),
+    Input("upload", "contents"),
     prevent_initial_call=True,
 )
 def update_topic_names(
@@ -188,6 +205,7 @@ def update_topic_names(
     current_topic_data: Wrapped[int],
     topic_name: str,
     fit_store: Dict,
+    upload_contents: List,
 ) -> Wrapped[List[str]]:
     """
     Updates topic names when the current topic name is changed or when a new model is fitted.
@@ -208,10 +226,20 @@ def update_topic_names(
     topic_names.data
         List of topic names.
     """
+    if ctx.triggered_id == "upload":
+        if not upload_contents:
+            raise PreventUpdate()
+        # If the data has been uploaded, parse contents and return them
+        _, content_string = upload_contents.split(",")
+        # Decoding data
+        decoded = base64.b64decode(content_string)
+        text = decoded.decode("utf-8")
+        data = json.loads(text)
+        return data["topic_names"]
     # Check if the callback has been triggered by the fit updating.
     if ctx.triggered_id == "fit_store":
         # If the store is empty prevent updating.
-        if fit_store is None:
+        if fit_store is None or fit_store["loaded"]:
             raise PreventUpdate()
         # Return a list of default topic names.
         return {
@@ -468,3 +496,23 @@ def update_all_documents_plot(
     )
     fig = documents_plot(document_data)
     return fig
+
+
+@cb(
+    Output("download", "data"),
+    Input("download_button", "n_clicks"),
+    State("fit_store", "data"),
+    State("topic_names", "data"),
+    prevent_initial_call=True,
+)
+def download_data(
+    n_clicks: int, fit_data: Dict, topic_names: Wrapped[str]
+) -> Dict:
+    if not n_clicks:
+        raise PreventUpdate()
+    if not fit_data or not topic_names:
+        raise PreventUpdate()
+    return {
+        "content": serialize_save_data(fit_data, topic_names),
+        "filename": "model_data.json",
+    }

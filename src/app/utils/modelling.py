@@ -260,4 +260,6 @@ def serialize_save_data(fit_data: Dict, topic_names: Dict) -> str:
     topic_names: wrapped list of str
         Data about the topic names.
     """
-    return json.dumps({"fit_data": fit_data, "topic_names": topic_names})
+    return json.dumps(
+        {"fit_data": {**fit_data, "loaded": True}, "topic_names": topic_names}
+    )

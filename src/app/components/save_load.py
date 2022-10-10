@@ -23,11 +23,18 @@ save_load = html.Div(
             title="Download data",
             className=button_class,
         ),
-        html.Button(
-            html.I(className="fa-solid fa-file-arrow-up"),
-            id="upload_button",
-            title="Upload data",
+        dcc.Download(id="download"),
+        html.Div(
             className=button_class,
+            children=dcc.Upload(
+                id="upload",
+                children=html.Button(
+                    html.I(className="fa-solid fa-file-arrow-up"),
+                    id="upload_button",
+                    title="Upload data",
+                    # className=button_class,
+                ),
+            ),
         ),
     ],
 )
