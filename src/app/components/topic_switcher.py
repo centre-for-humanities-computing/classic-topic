@@ -2,7 +2,7 @@
 from dash import html, dcc
 
 topic_switcher_class = """
-    fixed min-w-fit w-1/2 h-16 flex flex-row bg-white
+    fixed min-w-fit w-1/2 h-16 flex-row bg-white
     bg-opacity-100 shadow
     bottom-10 left-1/2
     justify-start z-10
@@ -12,7 +12,7 @@ topic_switcher_class = """
 
 topic_switcher = html.Div(
     id="topic_switcher",
-    className=topic_switcher_class + " -translate-x-1/2",
+    className=topic_switcher_class + " -translate-x-1/2 flex",
     children=[
         html.Button(
             "<- Previous topic",

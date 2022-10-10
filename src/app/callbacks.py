@@ -10,6 +10,8 @@ from dash.exceptions import PreventUpdate
 
 from app.components.sidebar import sidebar_body_class
 from app.components.topic_switcher import topic_switcher_class
+from app.components.navbar import navbar_button_class
+from app.layout import view_class
 from app.utils.modelling import (
     calculate_document_data,
     calculate_genre_importance,
@@ -18,7 +20,7 @@ from app.utils.modelling import (
     fit_pipeline,
     load_corpus,
 )
-from app.utils.plots import all_topics_plot, topic_plot
+from app.utils.plots import all_topics_plot, documents_plot, topic_plot
 
 callbacks = []
 
@@ -159,22 +161,27 @@ def update_topic_names(
     Output("topic_switcher", "className"),
     Output("sidebar_collapser", "children"),
     Input("sidebar_collapser", "n_clicks"),
+    Input("current_view", "data"),
     prevent_initial_call=True,
 )
-def open_close_sidebar(n_clicks: int) -> Tuple[str, str, str]:
-    if n_clicks is None:
+def open_close_sidebar(
+    n_clicks: int, current_view_data: Wrapped[str]
+) -> Tuple[str, str, str]:
+    if n_clicks is None or current_view_data is None:
         raise PreventUpdate()
+    view = current_view_data["current_view"]
+    hide_switcher = " flex" if view == "topic" else " hidden"
     is_open = (n_clicks % 2) == 0
     if is_open:
         return (
             sidebar_body_class + " translate-x-full",
-            topic_switcher_class + " -translate-x-1/2",
+            topic_switcher_class + " -translate-x-1/2" + hide_switcher,
             "⚙️",
         )
     else:
         return (
             sidebar_body_class + " translate-x-0",
-            topic_switcher_class + " -translate-x-2/3",
+            topic_switcher_class + " -translate-x-2/3" + hide_switcher,
             "✕",
         )
 
@@ -195,6 +202,53 @@ def open_close_sidebar_fitting(
         return current + 1
     else:
         raise PreventUpdate()
+
+
+@cb(
+    Output("current_view", "data"),
+    Input("topic_view_button", "n_clicks"),
+    Input("document_view_button", "n_clicks"),
+    prevent_initial_call=True,
+)
+def update_current_view(
+    topic_clicks: int, document_clicks: int
+) -> Wrapped[str]:
+    if not topic_clicks and not document_clicks:
+        raise PreventUpdate()
+    if ctx.triggered_id == "topic_view_button":
+        return {"current_view": "topic"}
+    if ctx.triggered_id == "document_view_button":
+        return {"current_view": "document"}
+    raise PreventUpdate()
+
+
+@cb(
+    Output("topic_view_button", "className"),
+    Output("document_view_button", "className"),
+    Output("topic_view", "className"),
+    Output("document_view", "className"),
+    Input("current_view", "data"),
+    prevent_initial_call=True,
+)
+def switch_views(current_view_data: Wrapped[str]) -> Tuple[str, str, str, str]:
+    if not current_view_data or "current_view" not in current_view_data:
+        raise PreventUpdate()
+    view = current_view_data["current_view"]
+    if view == "topic":
+        return (
+            navbar_button_class + " text-sky-700",
+            navbar_button_class + " text-gray-500",
+            view_class + " flex mb-16",
+            view_class + " hidden",
+        )
+    if view == "document":
+        return (
+            navbar_button_class + " text-gray-500",
+            navbar_button_class + " text-sky-700",
+            view_class + " hidden mb-16",
+            view_class + " flex",
+        )
+    raise PreventUpdate()
 
 
 @cb(
@@ -276,7 +330,31 @@ def update_all_topics_plot(
         raise PreventUpdate()
     topic_data = pd.DataFrame(fit_data["topic_data"])
     current_topic = current_topic_data["current_topic"]
-    names = pd.Series(topic_names_data["topic_names"])  # type: ignore
+    names = pd.Series(topic_names_data["topic_names"])
     topic_data = topic_data.assign(topic_name=topic_data.topic_id.map(names))
     fig = all_topics_plot(topic_data, current_topic)
+    return fig
+
+
+@cb(
+    Output("all_documents_plot", "figure"),
+    Input("fit_store", "data"),
+    Input("topic_names", "data"),
+)
+def update_all_documents_plot(
+    fit_data: Dict, topic_names_data: Wrapped[List[str]]
+) -> go.Figure:
+    if (
+        fit_data is None
+        or topic_names_data is None
+        or ("document_data" not in fit_data)
+        or ("topic_names" not in topic_names_data)
+    ):
+        raise PreventUpdate()
+    document_data = pd.DataFrame(fit_data["document_data"])
+    names = pd.Series(topic_names_data["topic_names"])
+    document_data = document_data.assign(
+        topic_name=document_data.topic_id.map(names)
+    )
+    fig = documents_plot(document_data)
     return fig

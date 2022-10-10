@@ -1,7 +1,7 @@
 # type: ignore
 from dash import dcc, html
 
-button_class = """
+navbar_button_class = """
     p-3 text-xl transition-all ease-in
     hover:text-sky-600
 """
@@ -18,12 +18,16 @@ navbar = html.Div(
         html.Button(
             html.I(className="fa-solid fa-hashtag"),
             title="Topics",
-            className=button_class + " text-sky-700",
+            id="topic_view_button",
+            className=navbar_button_class + " text-sky-700",
+            n_clicks=0,
         ),
         html.Button(
             html.I(className="fa-solid fa-book"),
             title="Documents",
-            className=button_class + " text-gray-500",
+            id="document_view_button",
+            className=navbar_button_class + " text-gray-500",
+            n_clicks=0,
         ),
     ],
 )

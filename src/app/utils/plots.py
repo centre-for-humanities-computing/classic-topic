@@ -32,6 +32,7 @@ def topic_plot(
         textinfo="label",
         domain=dict(x=[0, 0.5]),
         showlegend=False,
+        textposition="inside",
     )
     topic_word_trace = go.Bar(
         name="Importance for topic",
@@ -122,5 +123,45 @@ def all_topics_plot(topic_data: pd.DataFrame, current_topic: int) -> go.Figure:
         linewidth=6,
         zerolinewidth=2,
         zerolinecolor="#d1d5db",
+    )
+    return fig
+
+
+def documents_plot(document_data: pd.DataFrame) -> go.Figure:
+    fig = px.scatter_3d(
+        document_data,
+        x="x",
+        y="y",
+        z="z",
+        color="topic_name",
+        custom_data=["værk", "forfatter", "group", "tlg_genre", "topic_name"],
+    )
+    fig.update_traces(
+        hovertemplate="""
+            <b>%{customdata[0]} - %{customdata[1]}</b><br>
+            Dominant topic: <i> %{customdata[4]} </i> <br>
+            TLG genre: <i> %{customdata[3]} </i> <br>
+            Group: <i> %{customdata[2]} </i> <br>
+            <br>
+            <i>Click for more information...</i>
+        """
+    )
+    axis = dict(
+        showgrid=True,
+        zeroline=True,
+        visible=False,
+    )
+    fig.update_layout(
+        clickmode="event",
+        modebar_remove=["lasso2d", "select2d"],
+        hovermode="closest",
+        paper_bgcolor="rgba(1,1,1,0)",
+        plot_bgcolor="rgba(1,1,1,0)",
+        scene=dict(xaxis=axis, yaxis=axis, zaxis=axis),
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=16,
+            # font_family="Rockwell"
+        ),
     )
     return fig

@@ -207,7 +207,7 @@ def calculate_document_data(
     dim_red_pipeline = Pipeline(
         [
             ("SVD", TruncatedSVD(50)),
-            ("t-SNE", TSNE(3, init="pca", learning_rate="auto")),
+            ("t-SNE", TSNE(3, init="random", learning_rate="auto")),
         ]
     )
     # Calculating dimensions in 3D space
@@ -219,4 +219,5 @@ def calculate_document_data(
     md = md[~md.skal_fjernes]
     md = md[["id_nummer", "værk", "forfatter", "group", "tlg_genre"]]
     documents = documents.merge(md, on="id_nummer", how="inner")
+    documents = documents.assign(group=documents.group.fillna(""))
     return documents
