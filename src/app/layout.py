@@ -2,43 +2,49 @@
 import dash
 from dash import dcc, html
 
-import app.styles as styles
+from app.components.topic_switcher import topic_switcher
+from app.components.sidebar import sidebar
+from app.components.navbar import navbar
 
-from app import components
-
+view_class = "flex-row items-stretch flex-1 mr-16 z-0"
 
 layout = html.Div(
-    style=styles.window,
+    className="flex flex-row w-full h-full fixed",
     children=[
         dcc.Store(id="fit_store", storage_type="local"),
         dcc.Store(id="topic_names", storage_type="local"),
-        dcc.Store(id="current_topic", storage_type="local"),
+        dcc.Store(id="current_topic", data={"current_topic": 0}),
+        dcc.Store(
+            id="current_view",
+            storage_type="session",
+            data={"current_view": "topic"},
+        ),
         html.Div(
-            style={
-                **styles.page_visible,
-                "display": "flex",
-                "flex-direction": "column",
-            },
+            id="topic_view",
+            className=view_class + " flex mb-16",
             children=[
-                html.Div(
-                    id="plot_container",
-                    style={
-                        "display": "flex",
-                        "flex": "15 0",
-                    },
-                    children=dcc.Graph(
-                        id="plot_space",
-                        style={"height": "100%", "width": "100%"},
-                    ),
+                dcc.Graph(
+                    id="all_topics_plot", className="flex-1 basis-1/3 mt-10"
                 ),
-                components.topic_switcher,
+                dcc.Graph(
+                    id="current_topic_plot", className="flex-1 basis-2/3"
+                ),
             ],
         ),
         html.Div(
-            id="sidebar",
-            style=styles.sidebar,
-            children=[components.sidebar_collapser, components.sidebar_body],
+            id="document_view",
+            className=view_class + " hidden",
+            children=dcc.Graph(id="all_documents_plot", className="flex-1"),
         ),
+        dcc.Loading(
+            type="circle",
+            className="flex flex-1 mr-16 z-0",
+            fullscreen=True,
+            children=html.Div(id="loading"),
+        ),
+        topic_switcher,
+        sidebar,
+        navbar,
     ],
 )
 
