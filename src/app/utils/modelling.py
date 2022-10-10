@@ -1,5 +1,7 @@
 """Module for training topic pipelines and inferring data for plotting."""
 
+import json
+from typing import Dict, List
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
@@ -246,3 +248,16 @@ def calculate_document_data(
     documents = documents.merge(md, on="id_nummer", how="inner")
     documents = documents.assign(group=documents.group.fillna(""))
     return documents
+
+
+def serialize_save_data(fit_data: Dict, topic_names: Dict) -> str:
+    """Serializes model fit and topic name data and turns it into JSON, so that it can be saved.
+
+    Parameters
+    ----------
+    fit_data: dict
+        Data about the model fit.
+    topic_names: wrapped list of str
+        Data about the topic names.
+    """
+    return json.dumps({"fit_data": fit_data, "topic_names": topic_names})
