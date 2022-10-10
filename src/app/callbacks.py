@@ -1,3 +1,4 @@
+import json
 from typing import Any, Callable, Dict, Hashable, List, Tuple, TypeVar
 
 import dash
@@ -10,12 +11,14 @@ from dash.exceptions import PreventUpdate
 from app.components.sidebar import sidebar_body_class
 from app.components.topic_switcher import topic_switcher_class
 from app.utils.modelling import (
-    calculate_importance,
+    calculate_document_data,
+    calculate_genre_importance,
     calculate_top_words,
+    calculate_topic_data,
     fit_pipeline,
     load_corpus,
 )
-from app.utils.plots import genre_plot, join_plots, word_plot
+from app.utils.plots import all_topics_plot, topic_plot
 
 callbacks = []
 
@@ -74,12 +77,16 @@ def update_fit(
         model_name=model_name,
         n_topics=n_topics,
     )
-    importance = calculate_importance(corpus, pipeline)
+    genre_importance = calculate_genre_importance(corpus, pipeline)
     top_words = calculate_top_words(pipeline, top_n=30)
+    topic_data = calculate_topic_data(corpus, pipeline)
+    document_data = calculate_document_data(corpus, pipeline)
     return (
         {
-            "importance": importance.to_dict(),
+            "genre_importance": genre_importance.to_dict(),
             "top_words": top_words.to_dict(),
+            "topic_data": topic_data.to_dict(),
+            "document_data": document_data.to_dict(),
             "n_topics": n_topics,
         },
         [],
@@ -131,6 +138,8 @@ def update_topic_names(
     fit_store: Dict,
 ) -> Wrapped[List[str]]:
     if ctx.triggered_id == "fit_store":
+        if fit_store is None:
+            raise PreventUpdate()
         return {
             "topic_names": [f"Topic {i}" for i in range(fit_store["n_topics"])]
         }
@@ -148,21 +157,44 @@ def update_topic_names(
 @cb(
     Output("sidebar_body", "className"),
     Output("topic_switcher", "className"),
+    Output("sidebar_collapser", "children"),
     Input("sidebar_collapser", "n_clicks"),
     prevent_initial_call=True,
 )
-def open_close_sidebar(n_clicks: int) -> Tuple[str, str]:
-    is_open = (n_clicks % 2) == 1
+def open_close_sidebar(n_clicks: int) -> Tuple[str, str, str]:
+    if n_clicks is None:
+        raise PreventUpdate()
+    is_open = (n_clicks % 2) == 0
     if is_open:
         return (
             sidebar_body_class + " translate-x-full",
             topic_switcher_class + " -translate-x-1/2",
+            "⚙️",
         )
     else:
         return (
             sidebar_body_class + " translate-x-0",
             topic_switcher_class + " -translate-x-2/3",
+            "✕",
         )
+
+
+@cb(
+    Output("sidebar_collapser", "n_clicks"),
+    State("sidebar_collapser", "n_clicks"),
+    Input("fit_store", "data"),
+    Input("fit_pipeline", "n_clicks"),
+    prevent_initial_call=True,
+)
+def open_close_sidebar_fitting(
+    current: int, fit_data: Dict, n_clicks: int
+) -> int:
+    if ((ctx.triggered_id == "fit_store") and (fit_data is None)) or (
+        (ctx.triggered_id == "fit_pipeline") and n_clicks
+    ):
+        return current + 1
+    else:
+        raise PreventUpdate()
 
 
 @cb(
@@ -171,6 +203,7 @@ def open_close_sidebar(n_clicks: int) -> Tuple[str, str]:
     Input("fit_store", "data"),
     Input("next_topic", "n_clicks"),
     Input("prev_topic", "n_clicks"),
+    Input("all_topics_plot", "clickData"),
     prevent_initial_call=True,
 )
 def update_current_topic(
@@ -178,14 +211,21 @@ def update_current_topic(
     fit_store: Dict,
     next_clicks: int,
     prev_clicks: int,
+    plot_click_data: Dict,
 ) -> Wrapped[int]:
     if "fit_store" == ctx.triggered_id:
         return {"current_topic": 0}
-    if not next_clicks and not prev_clicks:
-        raise PreventUpdate()
     if current_topic_data is None or "current_topic" not in current_topic_data:
         raise PreventUpdate()
     current_topic = current_topic_data["current_topic"]
+    if "all_topics_plot" == ctx.triggered_id:
+        if plot_click_data is None:
+            raise PreventUpdate()
+        point, *_ = plot_click_data["points"]
+        topic_id, *_ = point["customdata"]
+        return {"current_topic": topic_id}
+    if not next_clicks and not prev_clicks:
+        raise PreventUpdate()
     if ctx.triggered_id == "next_topic":
         return {"current_topic": current_topic + 1}
     elif ctx.triggered_id == "prev_topic":
@@ -195,20 +235,48 @@ def update_current_topic(
 
 
 @cb(
-    Output("main_plot", "figure"),
+    Output("current_topic_plot", "figure"),
     Input("current_topic", "data"),
     Input("fit_store", "data"),
     prevent_initial_call=True,
 )
-def update_plot(
+def update_current_topic_plot(
     current_topic_data: Wrapped[int], fit_store: Dict
 ) -> go.Figure:
     if current_topic_data is None or fit_store is None:
         raise PreventUpdate()
     current_topic = current_topic_data["current_topic"]
-    importance = pd.DataFrame(fit_store["importance"])
+    genre_importance = pd.DataFrame(fit_store["genre_importance"])
     top_words = pd.DataFrame(fit_store["top_words"])
-    return join_plots(
-        genre_plot(current_topic, importance),
-        word_plot(current_topic, top_words),
+    return topic_plot(
+        current_topic, genre_importance=genre_importance, top_words=top_words
     )
+
+
+@cb(
+    Output("all_topics_plot", "figure"),
+    Input("fit_store", "data"),
+    Input("topic_names", "data"),
+    Input("current_topic", "data"),
+    prevent_initial_call=True,
+)
+def update_all_topics_plot(
+    fit_data: Dict,
+    topic_names_data: Wrapped[List[str]],
+    current_topic_data: Wrapped[int],
+) -> go.Figure:
+    if (
+        fit_data is None
+        or topic_names_data is None
+        or current_topic_data is None
+        or ("topic_data" not in fit_data)
+        or ("topic_names" not in topic_names_data)
+        or ("current_topic" not in current_topic_data)
+    ):
+        raise PreventUpdate()
+    topic_data = pd.DataFrame(fit_data["topic_data"])
+    current_topic = current_topic_data["current_topic"]
+    names = pd.Series(topic_names_data["topic_names"])  # type: ignore
+    topic_data = topic_data.assign(topic_name=topic_data.topic_id.map(names))
+    fig = all_topics_plot(topic_data, current_topic)
+    return fig

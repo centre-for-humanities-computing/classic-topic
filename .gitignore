@@ -1,3 +1,6 @@
 *.csv
 *.txt
+!requirements.txt
 *__pycache__/
+*.ipynb
+*.html

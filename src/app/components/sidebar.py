@@ -14,7 +14,7 @@ def hamburger_icon(color: str) -> html.Div:
 
 sidebar_body_class = """
     flex fixed w-3/12 h-full flex-col p-8 bg-white shadow-lg rounded-xl
-    transition-all ease-in space-y-3 top-0 right-0
+    transition-all ease-in space-y-3 top-0 right-0 z-30
 """
 
 sidebar = html.Div(
@@ -23,24 +23,26 @@ sidebar = html.Div(
         html.Div(
             className="""
             fixed flex-0 flex-row justify-end content-around
-            top-0 right-0 z-20 m-3 mr-4
+            top-0 right-0 z-40 m-3 mr-4
             """,
             children=html.Button(
-                hamburger_icon("bg-sky-700"),
+                "⚙️",
                 id="sidebar_collapser",
                 n_clicks=0,
                 className="""
                     flex justify-center content-center
-                    w-14 flex-0 w-12 h-12 m-1 mt-8
+                    w-14 flex-0 w-12 h-12 m-1 mt-5
+                    text-3xl text-center text-gray-800
+                    hover:text-sky-800
                 """,
             ),
         ),
         html.Div(
             id="sidebar_body",
-            className=sidebar_body_class + " translate-x-0",
+            className=sidebar_body_class + " translate-x-full",
             children=[
                 html.H1(
-                    "Pipeline Settings ⚙️",
+                    "Pipeline Settings",
                     className="text-2xl mt-2 mb-3",
                 ),
                 html.Span(
