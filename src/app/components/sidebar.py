@@ -1,17 +1,6 @@
 # type: ignore
 from dash import dcc, html
 
-
-def hamburger_icon(color: str) -> html.Div:
-    return html.Div(
-        className="space-y-2",
-        children=[
-            html.Span(className=f"block w-6 h-0.5 {color} rounded-full"),
-        ]
-        * 3,
-    )
-
-
 sidebar_body_class = """
     flex fixed w-3/12 h-full flex-col p-8 bg-white shadow-lg rounded-xl
     transition-all ease-in space-y-3 top-0 right-0 z-30
@@ -32,8 +21,8 @@ sidebar = html.Div(
                 className="""
                     flex justify-center content-center
                     w-14 flex-0 w-12 h-12 m-1 mt-5
-                    text-3xl text-center text-gray-800
-                    hover:text-sky-800
+                    text-3xl text-center text-gray-500
+                    hover:text-sky-700
                 """,
             ),
         ),
