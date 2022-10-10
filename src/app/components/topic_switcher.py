@@ -1,4 +1,5 @@
 # type: ignore
+"""Module describing the topic switcher component of the application."""
 from dash import html, dcc
 
 topic_switcher_class = """

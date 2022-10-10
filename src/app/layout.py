@@ -1,4 +1,6 @@
 # type: ignore
+"""Module describing the layout of the app"""
+
 import dash
 from dash import dcc, html
 
