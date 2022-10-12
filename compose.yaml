@@ -3,7 +3,7 @@ services:
     image: classic_topic/server
     build: .
     ports: 
-      - "8080:8080"
+      - "7011:8080"
     deploy:
       restart_policy:
         condition: on-failure

@@ -40,7 +40,7 @@ It's easiest to get started by running the app in docker compose:
 docker compose up
 ```
 
-This will spin up a container and attach to `localhost:8080`
+This will spin up a container and attach to `localhost:7011`
 
 ## Known limitations
 
