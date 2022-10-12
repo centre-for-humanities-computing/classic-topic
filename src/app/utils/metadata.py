@@ -1,22 +1,14 @@
 """Utilities for dealing with fetching and manipulating metadata"""
 
-from typing import Optional
 import pandas as pd
 
-
-def load_sheet_url() -> str:
-    """Loads sheet url from disk."""
-    with open("../dat/sheet_url.txt") as f:
-        url = f.read()
-    return url
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/181pbNCULuYKO5yPrWIfdmOLkrps2WUpfoJ8mtT56vuw/edit#gid=1762774185"
 
 
-def fetch_metadata(sheet_url: Optional[str] = None) -> pd.DataFrame:
+def fetch_metadata(sheet_url: str = DEFAULT_SHEET_URL) -> pd.DataFrame:
     """Fetches metadata in for of a Pandas Dataframe
     from the supplied Google Sheets URL.
     """
-    if sheet_url is None:
-        sheet_url = load_sheet_url()
     sheet_url = sheet_url.replace("/edit#gid=", "/export?format=csv&gid=")
     metadata = pd.read_csv(sheet_url)
     return metadata
