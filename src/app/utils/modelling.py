@@ -1,7 +1,7 @@
 """Module for training topic pipelines and inferring data for plotting."""
 
 import json
-from typing import Dict, List
+from typing import Dict
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
