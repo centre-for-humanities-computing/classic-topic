@@ -13,6 +13,7 @@ from dash.exceptions import PreventUpdate
 from app.components.sidebar import sidebar_body_class
 from app.components.topic_switcher import topic_switcher_class
 from app.components.navbar import navbar_button_class
+from app.components.genre_weight_popup import popup_container_class
 from app.layout import view_class
 from app.utils.modelling import (
     calculate_document_data,
@@ -24,6 +25,7 @@ from app.utils.modelling import (
     serialize_save_data,
 )
 from app.utils.plots import all_topics_plot, documents_plot, topic_plot
+from app.utils.metadata import fetch_metadata
 
 # Global callback list
 callbacks = []
@@ -61,6 +63,7 @@ def add_callbacks(app: dash.Dash) -> None:
     State("select_model", "value"),
     State("n_topics", "value"),
     Input("upload", "contents"),
+    State("genre_weights", "data"),
     prevent_initial_call=True,
 )
 def update_fit(
@@ -71,6 +74,7 @@ def update_fit(
     model_name: str,
     n_topics: int,
     upload_contents: List,
+    genre_weights: Dict[str, int],
 ) -> Tuple[Dict, List]:
     """Updates fit data in the local store when the fit model button is pressed.
 
@@ -88,6 +92,8 @@ def update_fit(
         Specifies which topic model should be trained on the corpus.
     n_topics: int
         Number of topics the model should find.
+    genre_weights: dict of str to int
+        Weights of the different genres.
 
     Returns
     -------
@@ -120,6 +126,7 @@ def update_fit(
         max_df=max_df,
         model_name=model_name,
         n_topics=n_topics,
+        genre_weights=genre_weights,
     )
     # Inferring data from the fit
     genre_importance = calculate_genre_importance(corpus, pipeline)
@@ -182,12 +189,8 @@ def update_topic_switcher(
     current = topic_names[current_topic]
     prev_disabled = current_topic == 0
     next_disabled = current_topic == n_topics - 1
-    prev_topic = (
-        "" if prev_disabled else "<- " + topic_names[current_topic - 1]
-    )
-    next_topic = (
-        "" if next_disabled else topic_names[current_topic + 1] + " ->"
-    )
+    prev_topic = "" if prev_disabled else "<- " + topic_names[current_topic - 1]
+    next_topic = "" if next_disabled else topic_names[current_topic + 1] + " ->"
     return next_topic, next_disabled, prev_topic, prev_disabled, current
 
 
@@ -242,9 +245,7 @@ def update_topic_names(
         if fit_store is None or fit_store["loaded"]:
             raise PreventUpdate()
         # Return a list of default topic names.
-        return {
-            "topic_names": [f"Topic {i}" for i in range(fit_store["n_topics"])]
-        }
+        return {"topic_names": [f"Topic {i}" for i in range(fit_store["n_topics"])]}
     # If there is no topic names data prevent updating.
     if topic_names_data is None or current_topic_data is None:
         raise PreventUpdate()
@@ -314,9 +315,7 @@ def open_close_sidebar(
     Input("fit_pipeline", "n_clicks"),
     prevent_initial_call=True,
 )
-def open_close_sidebar_fitting(
-    current: int, fit_data: Dict, n_clicks: int
-) -> int:
+def open_close_sidebar_fitting(current: int, fit_data: Dict, n_clicks: int) -> int:
     """Opens or closes sidebar when the fit pipeline button is pressed."""
     if ((ctx.triggered_id == "fit_store") and (fit_data is None)) or (
         (ctx.triggered_id == "fit_pipeline") and n_clicks
@@ -332,9 +331,7 @@ def open_close_sidebar_fitting(
     Input("document_view_button", "n_clicks"),
     prevent_initial_call=True,
 )
-def update_current_view(
-    topic_clicks: int, document_clicks: int
-) -> Wrapped[str]:
+def update_current_view(topic_clicks: int, document_clicks: int) -> Wrapped[str]:
     """Updates the current view value in store when a view is selected on the navbar."""
     if not topic_clicks and not document_clicks:
         raise PreventUpdate()
@@ -491,9 +488,7 @@ def update_all_documents_plot(
     # Mapping topic names over to topic ids with a Series
     # since Series also function as a mapping, you can use them in the .map() method
     names = pd.Series(topic_names_data["topic_names"])
-    document_data = document_data.assign(
-        topic_name=document_data.topic_id.map(names)
-    )
+    document_data = document_data.assign(topic_name=document_data.topic_id.map(names))
     fig = documents_plot(document_data)
     return fig
 
@@ -505,9 +500,7 @@ def update_all_documents_plot(
     State("topic_names", "data"),
     prevent_initial_call=True,
 )
-def download_data(
-    n_clicks: int, fit_data: Dict, topic_names: Wrapped[str]
-) -> Dict:
+def download_data(n_clicks: int, fit_data: Dict, topic_names: Wrapped[str]) -> Dict:
     if not n_clicks:
         raise PreventUpdate()
     if not fit_data or not topic_names:
@@ -516,3 +509,89 @@ def download_data(
         "content": serialize_save_data(fit_data, topic_names),
         "filename": "model_data.json",
     }
+
+
+@cb(
+    Output("genre_names", "data"),
+    Output("fetch_genres", "disabled"),
+    Input("fetch_genres", "n_intervals"),
+)
+def update_genre_names(n_intervals: int) -> Tuple[List[str], bool]:
+    """Fetches genre names from the metadata chart, and
+    disables updating afterwards"""
+    metadata = fetch_metadata()
+    metadata = metadata.assign(group=metadata.group.fillna("Rest"))
+    genres = metadata.group.unique()
+    # print(f"Fetched genres: {genres}")
+    return genres.tolist(), True
+
+@cb(
+    Output("genre_weights_slider", "value"),
+    Input("genre_weights_dropdown", "value"),
+    State("genre_weights", "data"),
+    prevent_initial_call=True,
+)
+def update_genre_weights_slider_value(selected: str, weights: Dict[str, int]) -> int:
+    """Updates genre weight slider value when another genre is selected
+    """
+    if not selected or not weights:
+        raise PreventUpdate()
+    return weights[selected]
+
+@cb(
+    Output("genre_weights_dropdown", "value"),
+    Output("genre_weights_dropdown", "options"),
+    Input("genre_names", "data"),
+    prevent_initial_call=True,
+)
+def set_genre_weight_dropdown_options(genre_names: List[str]) -> Tuple[str, List[str]]:
+    """Sets genre weight dropdown options and current value,
+    once genre names are loaded"""
+    if not genre_names:
+        raise PreventUpdate()
+    return genre_names[0], genre_names
+
+@cb(
+    Output("genre_weights", "data"),
+    Input("genre_names", "data"),
+    Input("genre_weights_slider", "value"),
+    State("genre_weights_dropdown", "value"),
+    State("genre_weights", "data"),
+    prevent_initial_call=True,
+)
+def update_genre_weights(
+    genre_names: List[str],
+    update_value: int,
+    selected: str,
+    prev_weights: Dict[str, int],
+) -> Tuple[Dict[str, int], bool]:
+    """Updates genre weights."""
+    # print("Updating genre weights")
+    if not genre_names:
+        raise PreventUpdate()
+    if ctx.triggered_id == "genre_names":
+        genre_weights = {genre_name: 1 for genre_name in genre_names}
+        return genre_weights
+    if ctx.triggered_id == "genre_weights_slider":
+        if not selected:
+            raise PreventUpdate()
+        genre_weights = {**prev_weights, selected: update_value}
+        return genre_weights
+    raise PreventUpdate()
+
+
+# @cb(
+#     Output("genre_weight_popup_container", "className"),
+#     Input("weight_settings", "n_clicks"),
+#     Input("close_weight_popup", "n_clicks"),
+#     prevent_initial_call=True,
+# )
+# def open_close_genre_weights_popup(open_clicks: int, close_clicks: int) -> str:
+#     """Opens and closes genre weights popup when needed"""
+#     if not open_clicks and not close_clicks:
+#         raise PreventUpdate()
+#     if "weight_settings" == ctx.triggered_id:
+#         return popup_container_class + " fixed"
+#     if "close_weight_popup" == ctx.triggered_id:
+#         return popup_container_class + " hidden"
+#     raise PreventUpdate()

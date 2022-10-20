@@ -31,6 +31,26 @@ def load_corpus() -> pd.DataFrame:
     """Loads the corpus from disk."""
     return pd.read_csv("../dat/cleaned_corpus.csv")
 
+def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
+    """Repeats rows by their individual weights in a specific weight column.
+
+    Parameters
+    ----------
+    df: DataFrame
+        Dataframe to repeat the rows of.
+    weight_col: str, default 'weight'
+        Name of the column that should be interpreted as weight.
+
+    Returns
+    -------
+    DataFrame
+        Dataframe witrh repeated rows.
+    """
+    index = df.index.to_series()
+    new_index = []
+    for ind, weight in zip(index, df[weight_col]):
+        new_index.extend([ind] * weight)
+    return df.loc[new_index]
 
 def fit_pipeline(
     corpus: pd.DataFrame,
@@ -39,6 +59,7 @@ def fit_pipeline(
     max_df: float,
     model_name: str,
     n_topics: int,
+    genre_weights: Dict[str, int],
 ) -> TopicPipeline:
     """Fits topic pipeline with the given parameters.
 
@@ -56,15 +77,26 @@ def fit_pipeline(
         Specifies which topic model should be trained on the corpus.
     n_topics: int
         Number of topics the model should find.
+    genre_weights: dict of str to int
+        Mapping of genre names to weights.
 
     Returns
     -------
     TopicPipeline
         Fitted topic pipeline.
     """
+    # Setting up pipeline
     topic_model = TOPIC_MODELS[model_name](n_components=n_topics)
     vectorizer = VECTORIZERS[vectorizer_name](min_df=min_df, max_df=max_df)
     pipeline = TopicPipeline(vectorizer=vectorizer, topic_model=topic_model)
+    # Weighting the different groups
+    metadata = fetch_metadata()
+    metadata = metadata.assign(group=metadata.group.fillna("Rest"))
+    metadata = metadata[["id_nummer", "group"]]
+    corpus = corpus.merge(metadata, on="id_nummer", how="inner")
+    corpus = corpus.assign(weight=corpus.group.map(genre_weights))
+    corpus = repeat_rows(corpus, weight_col="weight")
+    # Fitting the pipeline
     pipeline = pipeline.fit(corpus.text)
     return pipeline
 

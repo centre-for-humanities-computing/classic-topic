@@ -47,7 +47,7 @@ sidebar = html.Div(
                     className="mb-2",
                     options={
                         "bow": "Bag of Words",
-                        "tf_idf": "Term Frequency-Inverse Document Frequency",
+                        "tf-idf": "Term Frequency-Inverse Document Frequency",
                     },
                     value="bow",
                 ),
@@ -99,6 +99,29 @@ sidebar = html.Div(
                     value=100,
                     tooltip={"placement": "bottom", "always_visible": True},
                 ),
+                html.H2("Genre weights", className="text-xl mb-2"),
+                dcc.Dropdown(
+                    id="genre_weights_dropdown",
+                ),
+                dcc.Slider(
+                    1, 1000,
+                    step=None,
+                    id="genre_weights_slider",
+                    marks={number: str(number) for number in [1,10,50,100,200,500,1000]},
+                    value=0,
+                ),
+
+                # html.Button(
+                #     "Genre weights...",
+                #     id="weight_settings",
+                #     n_clicks=0,
+                #     className="""
+                #         text-xl mb-2 underline
+                #         text-sky-700 hover:text-sky-800
+                #         h-12 w-full flex-0 text-left mt-10
+                #         transition-all ease-in
+                #     """,
+                # ),
                 html.Div(className="flex-1"),
                 html.Button(
                     "Fit pipeline ✔️",
