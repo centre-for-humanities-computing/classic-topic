@@ -30,18 +30,19 @@ layout = html.Div(
             id="topic_view",
             className=view_class + " flex mb-16",
             children=[
-                dcc.Graph(
-                    id="all_topics_plot", className="flex-1 basis-1/3 mt-10"
-                ),
-                dcc.Graph(
-                    id="current_topic_plot", className="flex-1 basis-2/3"
-                ),
+                dcc.Graph(id="all_topics_plot", className="flex-1 basis-1/3 mt-10"),
+                dcc.Graph(id="current_topic_plot", className="flex-1 basis-2/3"),
             ],
         ),
         html.Div(
             id="document_view",
             className=view_class + " hidden",
-            children=dcc.Graph(id="all_documents_plot", className="flex-1"),
+            children=[
+                dcc.Graph(
+                    id="all_documents_plot", className="flex-1", clear_on_unhover=True
+                ),
+                dcc.Tooltip(id="documents_tooltip"),
+            ],
         ),
         dcc.Loading(
             type="circle",

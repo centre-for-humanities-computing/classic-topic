@@ -36,28 +36,40 @@ sidebar = html.Div(
                 ),
                 html.Span(
                     className="""
+                    block w-full bg-gray-50 h-0.5
+                    """
+                ),
+                # html.Span(className="h-5"),
+                html.H2("Feature extraction", className="text-lg font-bold"),
+                html.Span(
+                    className="""
                     block w-full bg-sky-50 h-0.5
                     """
                 ),
-                html.Span(className="h-5"),
-                html.H2("Vectorizer options", className="text-xl mb-2"),
-                html.H3("Vectorizer", className="text-base mb-2"),
+                html.H3("Vectorizer", className="italic text-base "),
                 dcc.Dropdown(
                     id="select_vectorizer",
-                    className="mb-2",
+                    className="mx-2",
                     options={
-                        "bow": "Bag of Words",
-                        "tf-idf": "Term Frequency-Inverse Document Frequency",
+                        "bow": "Count",
+                        "tf-idf": "TF-IDF",
                     },
                     value="bow",
                 ),
                 html.H3(
-                    "Maximum word document frequency",
-                    className="text-base mb-2",
+                    "N-gram range",
+                    className="italic text-base ",
+                ),
+                dcc.RangeSlider(
+                    1, 7, step=1, value=[1, 1], allowCross=False, id="n_gram_slider"
+                ),
+                html.H3(
+                    "Maximum feature document frequency",
+                    className="italic text-base ",
                 ),
                 dcc.Slider(
                     id="max_df",
-                    className="mb-2",
+                    className="",
                     min=0.0,
                     max=1.0,
                     step=0.1,
@@ -65,22 +77,50 @@ sidebar = html.Div(
                     tooltip={"placement": "bottom", "always_visible": True},
                 ),
                 html.H3(
-                    "Minimum word document occurrance",
-                    className="text-base mb-2",
+                    "Minimum feature document occurrance",
+                    className="italic text-base ",
                 ),
                 dcc.Slider(
                     id="min_df",
-                    className="mb-2",
+                    className="",
                     min=0,
                     max=50,
+                    step=1,
                     value=10,
+                    marks={i * 10: str(i * 10) for i in range(6)},
                     tooltip={"placement": "bottom", "always_visible": True},
                 ),
-                html.H2("Model options", className="text-xl mb-2"),
-                html.H3("Topic model", className="text-base mb-2"),
+                html.H3("Genre weights", className="italic text-base "),
+                dcc.Dropdown(
+                    id="genre_weights_dropdown",
+                    className="mx-2",
+                ),
+                dcc.Slider(
+                    1,
+                    1000,
+                    step=None,
+                    id="genre_weights_slider",
+                    tooltip={"placement": "bottom", "always_visible": True},
+                    marks={
+                        number: str(number)
+                        for number in [1, 10, 50, 100, 200, 500, 1000]
+                    },
+                    value=0,
+                ),
+                html.Span(
+                    className="""
+                    block w-full bg-gray-50 h-0.5
+                    """
+                ),
+                html.H2("Topic model", className="text-lg font-bold"),
+                html.Span(
+                    className="""
+                    block w-full bg-sky-50 h-0.5
+                    """
+                ),
                 dcc.Dropdown(
                     id="select_model",
-                    className="mb-2",
+                    className="mx-2",
                     options={
                         "nmf": "Non-negative Matrix Factorization",
                         "lda": "Latent Dirichlet Allocation",
@@ -89,28 +129,16 @@ sidebar = html.Div(
                     },
                     value="nmf",
                 ),
-                html.H3("Number of topics", className="text-base mb-2"),
+                html.H3("Number of topics", className="italic text-base "),
                 dcc.Slider(
                     id="n_topics",
-                    className="mb-2",
+                    className="",
                     min=10,
                     max=100,
                     step=10,
                     value=100,
                     tooltip={"placement": "bottom", "always_visible": True},
                 ),
-                html.H2("Genre weights", className="text-xl mb-2"),
-                dcc.Dropdown(
-                    id="genre_weights_dropdown",
-                ),
-                dcc.Slider(
-                    1, 1000,
-                    step=None,
-                    id="genre_weights_slider",
-                    marks={number: str(number) for number in [1,10,50,100,200,500,1000]},
-                    value=0,
-                ),
-
                 # html.Button(
                 #     "Genre weights...",
                 #     id="weight_settings",

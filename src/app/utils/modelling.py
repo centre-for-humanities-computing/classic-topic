@@ -1,13 +1,14 @@
 """Module for training topic pipelines and inferring data for plotting."""
 
 import json
-from typing import Dict
+from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.manifold import TSNE
 from sklearn.pipeline import Pipeline
+import scipy.sparse as spr
 from tweetopic import DMM, TopicPipeline
 from app.utils.metadata import fetch_metadata
 
@@ -31,6 +32,7 @@ def load_corpus() -> pd.DataFrame:
     """Loads the corpus from disk."""
     return pd.read_csv("../dat/cleaned_corpus.csv")
 
+
 def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
     """Repeats rows by their individual weights in a specific weight column.
 
@@ -44,13 +46,14 @@ def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
     Returns
     -------
     DataFrame
-        Dataframe witrh repeated rows.
+        Dataframe with repeated rows.
     """
     index = df.index.to_series()
     new_index = []
     for ind, weight in zip(index, df[weight_col]):
         new_index.extend([ind] * weight)
     return df.loc[new_index]
+
 
 def fit_pipeline(
     corpus: pd.DataFrame,
@@ -60,6 +63,7 @@ def fit_pipeline(
     model_name: str,
     n_topics: int,
     genre_weights: Dict[str, int],
+    n_gram_range: Tuple[int, int],
 ) -> TopicPipeline:
     """Fits topic pipeline with the given parameters.
 
@@ -79,6 +83,8 @@ def fit_pipeline(
         Number of topics the model should find.
     genre_weights: dict of str to int
         Mapping of genre names to weights.
+    n_gram_range: tuple of (int, int)
+        N-gram range parameter of the vectorizer
 
     Returns
     -------
@@ -87,7 +93,9 @@ def fit_pipeline(
     """
     # Setting up pipeline
     topic_model = TOPIC_MODELS[model_name](n_components=n_topics)
-    vectorizer = VECTORIZERS[vectorizer_name](min_df=min_df, max_df=max_df)
+    vectorizer = VECTORIZERS[vectorizer_name](
+        min_df=min_df, max_df=max_df, ngram_range=n_gram_range
+    )
     pipeline = TopicPipeline(vectorizer=vectorizer, topic_model=topic_model)
     # Weighting the different groups
     metadata = fetch_metadata()
@@ -99,6 +107,40 @@ def fit_pipeline(
     # Fitting the pipeline
     pipeline = pipeline.fit(corpus.text)
     return pipeline
+
+
+def calculate_topic_document_importance(
+    corpus: pd.DataFrame, pipeline: TopicPipeline
+) -> Dict[int, Dict[int, float]]:
+    """Calculates topic importances for each document.
+
+    Parameters
+    ----------
+    corpus: DataFrame
+        Data frame containing the cleaned corpus with ids.
+    pipeline: TopicPipeline
+        Fitted pipeline for topic modelling.
+
+    Returns
+    -------
+    dict of int to (dict of int to float)
+       Mapping of document ids to a dictionary of topic ids to importances.
+    """
+    pred = pipeline.transform(corpus.text)
+    lil = spr.lil_matrix(pred)
+    importance_list = []
+    for topic_ids, importances in zip(lil.rows, lil.data):
+        importance_list.append(
+            {
+                topic_id: importance
+                for topic_id, importance in zip(topic_ids, importances)
+            }
+        )
+    importance_dict = {
+        document_id: topics
+        for document_id, topics in zip(corpus.id_nummer, importance_list)
+    }
+    return importance_dict
 
 
 def calculate_genre_importance(
@@ -148,9 +190,7 @@ def calculate_genre_importance(
     )
     # Normalizing these quantities, so that group sizes do
     # not mess with the analysis
-    importance = importance.assign(
-        topic=importance.topic.map(lambda a: a / a.max())
-    )
+    importance = importance.assign(topic=importance.topic.map(lambda a: a / a.max()))
     # Adding topic labels to the embeddings by enumerating them
     # and then exploding them
     importance = importance.applymap(
@@ -164,9 +204,7 @@ def calculate_genre_importance(
     return importance
 
 
-def calculate_top_words(
-    pipeline: TopicPipeline, top_n: int = 30
-) -> pd.DataFrame:
+def calculate_top_words(pipeline: TopicPipeline, top_n: int = 30) -> pd.DataFrame:
     """Arranges top N words of each topic to a DataFrame.
 
     Parameters
@@ -206,9 +244,7 @@ def calculate_top_words(
     return top_words
 
 
-def calculate_topic_data(
-    corpus: pd.DataFrame, pipeline: TopicPipeline
-) -> pd.DataFrame:
+def calculate_topic_data(corpus: pd.DataFrame, pipeline: TopicPipeline) -> pd.DataFrame:
     """Calculates topic positions in 2D space as well as topic sizes
     based on their empirical importance in the corpus.
 
@@ -232,13 +268,9 @@ def calculate_topic_data(
     components = pipeline.topic_model.components_
     # Calculating topic positions with t-SNE
     x, y = (
-        TSNE(perplexity=5, init="pca", learning_rate="auto")
-        .fit_transform(components)
-        .T
+        TSNE(perplexity=5, init="pca", learning_rate="auto").fit_transform(components).T
     )
-    return pd.DataFrame(
-        {"topic_id": range(n_topics), "x": x, "y": y, "size": size}
-    )
+    return pd.DataFrame({"topic_id": range(n_topics), "x": x, "y": y, "size": size})
 
 
 def calculate_document_data(
@@ -271,9 +303,7 @@ def calculate_document_data(
     )
     # Calculating dimensions in 3D space
     x, y, z = dim_red_pipeline.fit_transform(dtm).T
-    documents = corpus.assign(x=x, y=y, z=z, topic_id=pred).drop(
-        columns="text"
-    )
+    documents = corpus.assign(x=x, y=y, z=z, topic_id=pred).drop(columns="text")
     md = fetch_metadata()
     md = md[~md.skal_fjernes]
     md = md[["id_nummer", "værk", "forfatter", "group", "tlg_genre"]]

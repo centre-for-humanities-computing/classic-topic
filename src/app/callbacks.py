@@ -14,12 +14,14 @@ from app.components.sidebar import sidebar_body_class
 from app.components.topic_switcher import topic_switcher_class
 from app.components.navbar import navbar_button_class
 from app.components.genre_weight_popup import popup_container_class
+from app.components.document_tooltip import document_tooltip
 from app.layout import view_class
 from app.utils.modelling import (
     calculate_document_data,
     calculate_genre_importance,
     calculate_top_words,
     calculate_topic_data,
+    calculate_topic_document_importance,
     fit_pipeline,
     load_corpus,
     serialize_save_data,
@@ -64,6 +66,7 @@ def add_callbacks(app: dash.Dash) -> None:
     State("n_topics", "value"),
     Input("upload", "contents"),
     State("genre_weights", "data"),
+    State("n_gram_slider", "value"),
     prevent_initial_call=True,
 )
 def update_fit(
@@ -75,6 +78,7 @@ def update_fit(
     n_topics: int,
     upload_contents: List,
     genre_weights: Dict[str, int],
+    n_gram_range: List[int],
 ) -> Tuple[Dict, List]:
     """Updates fit data in the local store when the fit model button is pressed.
 
@@ -94,6 +98,8 @@ def update_fit(
         Number of topics the model should find.
     genre_weights: dict of str to int
         Weights of the different genres.
+    n_gram_range: list of int
+        N-gram range parameter of the vectorizer
 
     Returns
     -------
@@ -127,18 +133,21 @@ def update_fit(
         model_name=model_name,
         n_topics=n_topics,
         genre_weights=genre_weights,
+        n_gram_range=tuple(n_gram_range),
     )
     # Inferring data from the fit
     genre_importance = calculate_genre_importance(corpus, pipeline)
     top_words = calculate_top_words(pipeline, top_n=30)
     topic_data = calculate_topic_data(corpus, pipeline)
     document_data = calculate_document_data(corpus, pipeline)
+    document_topic_importance = calculate_topic_document_importance(corpus, pipeline)
     return (
         {
             "genre_importance": genre_importance.to_dict(),
             "top_words": top_words.to_dict(),
             "topic_data": topic_data.to_dict(),
             "document_data": document_data.to_dict(),
+            "document_topic_importance": document_topic_importance,
             "n_topics": n_topics,
             "loaded": False,
         },
@@ -525,6 +534,7 @@ def update_genre_names(n_intervals: int) -> Tuple[List[str], bool]:
     # print(f"Fetched genres: {genres}")
     return genres.tolist(), True
 
+
 @cb(
     Output("genre_weights_slider", "value"),
     Input("genre_weights_dropdown", "value"),
@@ -532,11 +542,11 @@ def update_genre_names(n_intervals: int) -> Tuple[List[str], bool]:
     prevent_initial_call=True,
 )
 def update_genre_weights_slider_value(selected: str, weights: Dict[str, int]) -> int:
-    """Updates genre weight slider value when another genre is selected
-    """
+    """Updates genre weight slider value when another genre is selected"""
     if not selected or not weights:
         raise PreventUpdate()
     return weights[selected]
+
 
 @cb(
     Output("genre_weights_dropdown", "value"),
@@ -550,6 +560,7 @@ def set_genre_weight_dropdown_options(genre_names: List[str]) -> Tuple[str, List
     if not genre_names:
         raise PreventUpdate()
     return genre_names[0], genre_names
+
 
 @cb(
     Output("genre_weights", "data"),
@@ -578,6 +589,31 @@ def update_genre_weights(
         genre_weights = {**prev_weights, selected: update_value}
         return genre_weights
     raise PreventUpdate()
+
+
+@cb(
+    Output("documents_tooltip", "show"),
+    Output("documents_tooltip", "bbox"),
+    Output("documents_tooltip", "children"),
+    Input("all_documents_plot", "hoverData"),
+    State("fit_store", "data"),
+    State("topic_names", "data"),
+)
+def show_document_tooltip(
+    hover_data: Dict, fit_data: Dict, topic_names_data: Wrapped[List[str]]
+):
+    if not hover_data:
+        return False, dash.no_update, dash.no_update
+    point, *_ = hover_data["points"]
+    bounding_box = point["bbox"]
+    work, author, group, tlg_genre, _, text_id = point["customdata"]
+    importances = fit_data["document_topic_importance"]
+    # print(importances)
+    topic_names = topic_names_data["topic_names"]
+    children = document_tooltip(
+        work, author, group, tlg_genre, importances[str(text_id)], topic_names
+    )
+    return True, bounding_box, children
 
 
 # @cb(
