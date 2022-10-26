@@ -2,12 +2,14 @@
 from typing import Dict, List
 
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
+import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-def topic_plot(topic: int, genre_importance: pd.DataFrame, top_words: pd.DataFrame):
+def topic_plot(
+    topic: int, genre_importance: pd.DataFrame, top_words: pd.DataFrame
+):
     """Plots genre and word importances for currently selected topic.
 
     Parameters
@@ -155,17 +157,33 @@ def documents_plot(document_data: pd.DataFrame) -> go.Figure:
             "id_nummer",
         ],
     )
-    fig.update_traces(hoverinfo="none", hovertemplate=None)
-    # fig.update_traces(
-    #     hovertemplate="""
-    #         <b>%{customdata[0]} - %{customdata[1]}</b><br>
-    #         Dominant topic: <i> %{customdata[4]} </i> <br>
-    #         TLG genre: <i> %{customdata[3]} </i> <br>
-    #         Group: <i> %{customdata[2]} </i> <br>
-    #         <br>
-    #         <i>Click for more information...</i>
-    #     """
-    # )
+    # fig.update_traces(hovertemplate=None, hoverinfo="none")
+    fig.update_traces(
+        hovertemplate="""
+            %{customdata[0]} - %{customdata[1]}<br>
+            <i>Click to select</i>
+        """
+    )
+    annotations = []
+    for _index, row in document_data.iterrows():
+        name = f"{row.værk} - {row.forfatter}"
+        annotations.append(
+            dict(
+                x=row.x,
+                y=row.y,
+                z=row.z,
+                text=name,
+                bgcolor="white",
+                bordercolor="black",
+                arrowsize=1,
+                arrowwidth=2,
+                borderwidth=3,
+                borderpad=10,
+                font=dict(size=16, color="#0369a1"),
+                visible=False,
+                # clicktoshow="onout",
+            )
+        )
     axis = dict(
         showgrid=True,
         zeroline=True,
@@ -173,15 +191,14 @@ def documents_plot(document_data: pd.DataFrame) -> go.Figure:
     )
     fig.update_layout(
         # clickmode="event",
+        # uirevision=True,
         modebar_remove=["lasso2d", "select2d"],
         hovermode="closest",
         paper_bgcolor="rgba(1,1,1,0)",
         plot_bgcolor="rgba(1,1,1,0)",
-        scene=dict(xaxis=axis, yaxis=axis, zaxis=axis),
-        hoverlabel=dict(
-            bgcolor="white",
-            font_size=16,
-            # font_family="Rockwell"
+        hoverlabel=dict(font_size=11),
+        scene=dict(
+            xaxis=axis, yaxis=axis, zaxis=axis, annotations=annotations
         ),
     )
     return fig
@@ -210,12 +227,14 @@ def document_topic_plot(
     )
     importances = importances.assign(topic_id=importances.topic_id.astype(int))
     name_mapping = pd.Series(topic_names)
-    importances = importances.assign(topic_name=importances.topic_id.map(name_mapping))
+    importances = importances.assign(
+        topic_name=importances.topic_id.map(name_mapping)
+    )
     fig = px.pie(
         importances,
         values="importance",
         names="topic_name",
-        color_discrete_sequence=px.colors.sequential.RdBu
+        color_discrete_sequence=px.colors.sequential.RdBu,
     )
     fig.update_traces(textposition="inside", textinfo="label")
     fig.update_layout(

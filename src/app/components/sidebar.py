@@ -61,7 +61,12 @@ sidebar = html.Div(
                     className="italic text-base ",
                 ),
                 dcc.RangeSlider(
-                    1, 7, step=1, value=[1, 1], allowCross=False, id="n_gram_slider"
+                    1,
+                    7,
+                    step=1,
+                    value=[1, 1],
+                    allowCross=False,
+                    id="n_gram_slider",
                 ),
                 html.H3(
                     "Maximum feature document frequency",

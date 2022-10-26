@@ -1,15 +1,17 @@
 """Module for training topic pipelines and inferring data for plotting."""
 
 import json
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
+import scipy.sparse as spr
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.manifold import TSNE
 from sklearn.pipeline import Pipeline
-import scipy.sparse as spr
 from tweetopic import DMM, TopicPipeline
+
 from app.utils.metadata import fetch_metadata
 
 # Mapping of names to topic models
@@ -57,6 +59,7 @@ def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
 
 def fit_pipeline(
     corpus: pd.DataFrame,
+    metadata: pd.DataFrame,
     vectorizer_name: str,
     min_df: int,
     max_df: float,
@@ -71,6 +74,8 @@ def fit_pipeline(
     ----------
     corpus: DataFrame
         Corpus data containing texts and ids.
+    metadata: DataFrame
+        Metadata about the corpus.
     vectorizer_name: {'tf-idf', 'bow'}
         Describes whether a TF-IDF of Bag of Words vectorizer should be fitted.
     min_df: int
@@ -98,8 +103,6 @@ def fit_pipeline(
     )
     pipeline = TopicPipeline(vectorizer=vectorizer, topic_model=topic_model)
     # Weighting the different groups
-    metadata = fetch_metadata()
-    metadata = metadata.assign(group=metadata.group.fillna("Rest"))
     metadata = metadata[["id_nummer", "group"]]
     corpus = corpus.merge(metadata, on="id_nummer", how="inner")
     corpus = corpus.assign(weight=corpus.group.map(genre_weights))
@@ -190,7 +193,9 @@ def calculate_genre_importance(
     )
     # Normalizing these quantities, so that group sizes do
     # not mess with the analysis
-    importance = importance.assign(topic=importance.topic.map(lambda a: a / a.max()))
+    importance = importance.assign(
+        topic=importance.topic.map(lambda a: a / a.max())
+    )
     # Adding topic labels to the embeddings by enumerating them
     # and then exploding them
     importance = importance.applymap(
@@ -204,7 +209,9 @@ def calculate_genre_importance(
     return importance
 
 
-def calculate_top_words(pipeline: TopicPipeline, top_n: int = 30) -> pd.DataFrame:
+def calculate_top_words(
+    pipeline: TopicPipeline, top_n: int = 30
+) -> pd.DataFrame:
     """Arranges top N words of each topic to a DataFrame.
 
     Parameters
@@ -244,7 +251,9 @@ def calculate_top_words(pipeline: TopicPipeline, top_n: int = 30) -> pd.DataFram
     return top_words
 
 
-def calculate_topic_data(corpus: pd.DataFrame, pipeline: TopicPipeline) -> pd.DataFrame:
+def calculate_topic_data(
+    corpus: pd.DataFrame, pipeline: TopicPipeline
+) -> pd.DataFrame:
     """Calculates topic positions in 2D space as well as topic sizes
     based on their empirical importance in the corpus.
 
@@ -268,15 +277,20 @@ def calculate_topic_data(corpus: pd.DataFrame, pipeline: TopicPipeline) -> pd.Da
     components = pipeline.topic_model.components_
     # Calculating topic positions with t-SNE
     x, y = (
-        TSNE(perplexity=5, init="pca", learning_rate="auto").fit_transform(components).T
+        TSNE(perplexity=5, init="pca", learning_rate="auto")
+        .fit_transform(components)
+        .T
     )
-    return pd.DataFrame({"topic_id": range(n_topics), "x": x, "y": y, "size": size})
+    return pd.DataFrame(
+        {"topic_id": range(n_topics), "x": x, "y": y, "size": size}
+    )
 
 
 def calculate_document_data(
     corpus: pd.DataFrame, pipeline: TopicPipeline
 ) -> pd.DataFrame:
-    """Calculates document positions in 3D space as well as predictions for dominant topic.
+    """Calculates document positions in 3D space as well
+    as predictions for dominant topic.
 
     Parameters
     ----------
@@ -303,7 +317,9 @@ def calculate_document_data(
     )
     # Calculating dimensions in 3D space
     x, y, z = dim_red_pipeline.fit_transform(dtm).T
-    documents = corpus.assign(x=x, y=y, z=z, topic_id=pred).drop(columns="text")
+    documents = corpus.assign(x=x, y=y, z=z, topic_id=pred).drop(
+        columns="text"
+    )
     md = fetch_metadata()
     md = md[~md.skal_fjernes]
     md = md[["id_nummer", "værk", "forfatter", "group", "tlg_genre"]]
@@ -312,14 +328,15 @@ def calculate_document_data(
     return documents
 
 
-def serialize_save_data(fit_data: Dict, topic_names: Dict) -> str:
-    """Serializes model fit and topic name data and turns it into JSON, so that it can be saved.
+def serialize_save_data(fit_data: Dict, topic_names: List[str]) -> str:
+    """Serializes model fit and topic name data and turns it into JSON,
+    so that it can be saved.
 
     Parameters
     ----------
     fit_data: dict
         Data about the model fit.
-    topic_names: wrapped list of str
+    topic_names: list of str
         Data about the topic names.
     """
     return json.dumps(
