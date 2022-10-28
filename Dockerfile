@@ -8,6 +8,7 @@ RUN pip install numpy
 RUN pip install pandas
 RUN pip install sklearn
 RUN pip install dash
+RUN pip install dash-daq
 
 COPY src src
 

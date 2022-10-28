@@ -9,6 +9,8 @@ from app.components.navbar import navbar
 from app.components.save_load import save_load
 from app.components.sidebar import sidebar
 from app.components.topic_switcher import topic_switcher
+from app.components.genre_weight_popup import genre_weight_popup
+
 
 view_class = "flex-row items-stretch flex-1 mr-16 z-0"
 
@@ -60,7 +62,7 @@ layout = html.Div(
         sidebar,
         navbar,
         save_load,
-        # genre_weight_popup
+        genre_weight_popup
     ],
 )
 

@@ -11,6 +11,9 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
 from app.components.document_tooltip import document_tooltip
+from app.components.genre_weight_popup import (genre_weight_element,
+                                               popup_container_class,
+                                               setting_container_class)
 from app.components.navbar import navbar_button_class
 from app.components.sidebar import sidebar_body_class
 from app.components.topic_switcher import topic_switcher_class
@@ -106,7 +109,7 @@ def update_fit(
         Empty list, is returned so that the loading component activates
         while the callback is executed.
     """
-    print(ctx.triggered_id)
+    # print(ctx.triggered_id)
     if ctx.triggered_id == "upload":
         if not upload_contents:
             raise PreventUpdate()
@@ -119,14 +122,10 @@ def update_fit(
         return data["fit_data"], []
     # If the button has not actually been clicked prevent updating
     if not n_clicks or not genre_weights:
-        print(
-            f"Preventing upgrade, n_clicks: {n_clicks}, genre_weights: {genre_weights}"
-        )
         raise PreventUpdate
     # Fitting the topic pipeline
     metadata = pd.DataFrame.from_dict(metadata_store)
     n_gram_low, n_gram_high, *_ = n_gram_range
-    print("fitting")
     pipeline = fit_pipeline(
         metadata=metadata,
         corpus=corpus,
@@ -273,7 +272,6 @@ def update_topic_names(
 @cb(
     Output("sidebar_body", "className"),
     Output("topic_switcher", "className"),
-    Output("sidebar_collapser", "children"),
     Input("sidebar_collapser", "n_clicks"),
     Input("current_view", "data"),
     prevent_initial_call=True,
@@ -305,13 +303,11 @@ def open_close_sidebar(
         return (
             sidebar_body_class + " translate-x-full",
             topic_switcher_class + " -translate-x-1/2" + hide_switcher,
-            "⚙️",
         )
     else:
         return (
             sidebar_body_class + " translate-x-0",
             topic_switcher_class + " -translate-x-2/3" + hide_switcher,
-            "✕",
         )
 
 
@@ -554,72 +550,117 @@ def download_data(
 )
 def fetch_data(n_intervals: int) -> Dict:
     """Fetches metadata and puts it into a dash store."""
-    print("Fetching metadata")
+    # print("Fetching metadata")
     metadata = fetch_metadata()
     metadata = metadata.assign(group=metadata.group.fillna("Rest"))
     return metadata.to_dict()
 
 
+# @cb(
+#     Output("genre_weights_dropdown", "value"),
+#     Output("genre_weights_dropdown", "options"),
+#     Input("metadata", "data"),
+#     prevent_initial_call=True,
+# )
+# def set_genre_weight_dropdown_options(
+#     metadata_store: Dict,
+# ) -> Tuple[str, List[str]]:
+#     """Fetches genre names from the metadata chart, and
+#     disables updating afterwards"""
+#     metadata: pd.DataFrame = pd.DataFrame.from_dict(metadata_store)
+#     genres = metadata.group.unique()
+#     genres = genres.tolist()
+#     print(f"Fetched genres: {genres}")
+#     return genres[0], genres
+
+
 @cb(
-    Output("genre_weights_dropdown", "value"),
-    Output("genre_weights_dropdown", "options"),
+    Output("genre_weight_popup", "children"),
     Input("metadata", "data"),
     prevent_initial_call=True,
 )
-def set_genre_weight_dropdown_options(
-    metadata_store: Dict,
-) -> Tuple[str, List[str]]:
-    """Fetches genre names from the metadata chart, and
-    disables updating afterwards"""
+def update_genre_weights_popup_children(metadata_store: Dict) -> List:
+    """Updates the children of the genre weights popup"""
     metadata: pd.DataFrame = pd.DataFrame.from_dict(metadata_store)
     genres = metadata.group.unique()
-    genres = genres.tolist()
-    print(f"Fetched genres: {genres}")
-    return genres[0], genres
+    return [genre_weight_element(genre) for genre in genres]
 
 
-@cb(
-    Output("genre_weights_slider", "value"),
-    Input("genre_weights_dropdown", "value"),
-    State("genre_weights", "data"),
-    prevent_initial_call=True,
-)
-def update_genre_weights_slider_value(
-    selected: str, weights: Dict[str, int]
-) -> int:
-    """Updates genre weight slider value when another genre is selected"""
-    if not selected or not weights:
-        raise PreventUpdate()
-    return weights[selected]
+# @cb(
+#     Output("genre_weights_slider", "value"),
+#     Input("genre_weights_dropdown", "value"),
+#     State("genre_weights", "data"),
+#     prevent_initial_call=True,
+# )
+# def update_genre_weights_slider_value(
+#     selected: str, weights: Dict[str, int]
+# ) -> int:
+#     """Updates genre weight slider value when another genre is selected"""
+#     if not selected or not weights:
+#         raise PreventUpdate()
+#     return weights[selected]
+
+
+# @cb(
+#     Output("genre_weights", "data"),
+#     Input("genre_weights_dropdown", "options"),
+#     Input("genre_weights_slider", "value"),
+#     State("genre_weights_dropdown", "value"),
+#     State("genre_weights", "data"),
+#     prevent_initial_call=True,
+# )
+# def update_genre_weights(
+#     genre_names: List[str],
+#     update_value: int,
+#     selected: str,
+#     prev_weights: Dict[str, int],
+# ) -> Dict[str, int]:
+#     """Updates genre weights."""
+#     # print("Updating genre weights")
+#     if not genre_names:
+#         raise PreventUpdate()
+#     if ctx.triggered_id == "genre_weights_dropdown":
+#         genre_weights = {genre_name: 1 for genre_name in genre_names}
+#         return genre_weights
+#     if ctx.triggered_id == "genre_weights_slider":
+#         if not selected:
+#             raise PreventUpdate()
+#         genre_weights = {**prev_weights, selected: update_value}
+#         return genre_weights
+#     raise PreventUpdate()
 
 
 @cb(
     Output("genre_weights", "data"),
-    Input("genre_weights_dropdown", "options"),
-    Input("genre_weights_slider", "value"),
-    State("genre_weights_dropdown", "value"),
-    State("genre_weights", "data"),
+    Input(dict(type="genre_switch", index=dash.ALL), "on"),
+    State(dict(type="genre_switch", index=dash.ALL), "id"),
+    Input(dict(type="genre_weight_slider", index=dash.ALL), "value"),
+    State(dict(type="genre_weight_slider", index=dash.ALL), "id"),
     prevent_initial_call=True,
 )
 def update_genre_weights(
-    genre_names: List[str],
-    update_value: int,
-    selected: str,
-    prev_weights: Dict[str, int],
-) -> Dict[str, int]:
-    """Updates genre weights."""
-    # print("Updating genre weights")
-    if not genre_names:
+    is_on: List[bool],
+    switch_ids: List[Dict[str, str]],
+    weights: List[int],
+    weight_ids: List[Dict[str, str]],
+):
+    """Updates genre weights based on the values set in the popup."""
+    if not is_on or not switch_ids or not weights or not weight_ids:
         raise PreventUpdate()
-    if ctx.triggered_id == "genre_weights_dropdown":
-        genre_weights = {genre_name: 1 for genre_name in genre_names}
-        return genre_weights
-    if ctx.triggered_id == "genre_weights_slider":
-        if not selected:
-            raise PreventUpdate()
-        genre_weights = {**prev_weights, selected: update_value}
-        return genre_weights
-    raise PreventUpdate()
+    is_on_mapping = {id["index"]: on for id, on in zip(switch_ids, is_on)}
+    # print("is on mapping:", is_on_mapping)
+    weight_mapping = {
+        id["index"]: weight for id, weight in zip(weight_ids, weights)
+    }
+    # print("weight mapping:", weight_mapping)
+    genres = is_on_mapping.keys()
+    genre_weights = {
+        genre: weight_mapping[genre] if is_on_mapping[genre] else 0
+        for genre in genres
+    }
+    # print("Changing genre weights:")
+    # print(genre_weights)
+    return genre_weights
 
 
 @cb(
@@ -701,19 +742,33 @@ def update_document_inspector(
 #     return True, bounding_box, children
 
 
-# @cb(
-#     Output("genre_weight_popup_container", "className"),
-#     Input("weight_settings", "n_clicks"),
-#     Input("close_weight_popup", "n_clicks"),
-#     prevent_initial_call=True,
-# )
-# def open_close_genre_weights_popup(open_clicks: int, close_clicks: int) ->
-# str:
-#     """Opens and closes genre weights popup when needed"""
-#     if not open_clicks and not close_clicks:
-#         raise PreventUpdate()
-#     if "weight_settings" == ctx.triggered_id:
-#         return popup_container_class + " fixed"
-#     if "close_weight_popup" == ctx.triggered_id:
-#         return popup_container_class + " hidden"
-#     raise PreventUpdate()
+@cb(
+    Output("genre_weight_popup_container", "className"),
+    Input("weight_settings", "n_clicks"),
+    Input("close_weight_popup", "n_clicks"),
+    prevent_initial_call=True,
+)
+def open_close_genre_weights_popup(open_clicks: int, close_clicks: int) -> str:
+    """Opens and closes genre weights popup when needed"""
+    if not open_clicks and not close_clicks:
+        raise PreventUpdate()
+    if "weight_settings" == ctx.triggered_id:
+        return popup_container_class + " fixed"
+    if "close_weight_popup" == ctx.triggered_id:
+        return popup_container_class + " hidden"
+    raise PreventUpdate()
+
+
+@cb(
+    Output(
+        dict(type="genre_settings_container", index=dash.MATCH), "className"
+    ),
+    Input(dict(type="genre_switch", index=dash.MATCH), "on"),
+    prevent_initial_call=True,
+)
+def hide_genre_settings(is_genre_on: bool) -> str:
+    """Hides settings for a genre if it is filtered away in the popup"""
+    if is_genre_on:
+        return setting_container_class
+    else:
+        return setting_container_class + " hidden"

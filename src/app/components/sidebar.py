@@ -15,13 +15,13 @@ sidebar = html.Div(
             top-0 right-0 z-40 m-3 mr-4
             """,
             children=html.Button(
-                "⚙️",
+                html.I(className="fa-solid fa-gears"),
                 id="sidebar_collapser",
                 n_clicks=0,
                 className="""
                     flex justify-center content-center
-                    w-14 flex-0 w-12 h-12 m-1 mt-5
-                    text-3xl text-center text-gray-500
+                    flex-0 h-12 m-1 mt-5
+                    text-2xl text-center text-gray-500
                     hover:text-sky-700
                 """,
             ),
@@ -30,10 +30,10 @@ sidebar = html.Div(
             id="sidebar_body",
             className=sidebar_body_class + " translate-x-full",
             children=[
-                html.H1(
-                    "Pipeline Settings",
-                    className="text-2xl mt-2 mb-3",
-                ),
+                #  html.H1(
+                #      "Pipeline Settings",
+                #      className="text-2xl mt-2 mb-3",
+                #  ),
                 html.Span(
                     className="""
                     block w-full bg-gray-50 h-0.5
@@ -95,22 +95,18 @@ sidebar = html.Div(
                     marks={i * 10: str(i * 10) for i in range(6)},
                     tooltip={"placement": "bottom", "always_visible": True},
                 ),
-                html.H3("Genre weights", className="italic text-base "),
-                dcc.Dropdown(
-                    id="genre_weights_dropdown",
-                    className="mx-2",
-                ),
-                dcc.Slider(
-                    1,
-                    1000,
-                    step=None,
-                    id="genre_weights_slider",
-                    tooltip={"placement": "bottom", "always_visible": True},
-                    marks={
-                        number: str(number)
-                        for number in [1, 10, 50, 100, 200, 500, 1000]
-                    },
-                    value=0,
+                html.Button(
+                    html.H3(
+                        "Genre filtering/weights...",
+                        className="italic text-base ",
+                    ),
+                    n_clicks=0,
+                    id="weight_settings",
+                    className="""
+                        text-sky-700
+                        hover:text-sky-800
+                        p-1
+                    """,
                 ),
                 html.Span(
                     className="""
@@ -130,7 +126,7 @@ sidebar = html.Div(
                         "nmf": "Non-negative Matrix Factorization",
                         "lda": "Latent Dirichlet Allocation",
                         "lsa": "Latent Semantic Allocation/Indexing",
-                        "dmm": "Dirichlet Multinomial Mixture (best for short texts)",
+                        "dmm": "Dirichlet Multinomial Mixture",
                     },
                     value="nmf",
                 ),
@@ -144,20 +140,13 @@ sidebar = html.Div(
                     value=100,
                     tooltip={"placement": "bottom", "always_visible": True},
                 ),
-                # html.Button(
-                #     "Genre weights...",
-                #     id="weight_settings",
-                #     n_clicks=0,
-                #     className="""
-                #         text-xl mb-2 underline
-                #         text-sky-700 hover:text-sky-800
-                #         h-12 w-full flex-0 text-left mt-10
-                #         transition-all ease-in
-                #     """,
-                # ),
                 html.Div(className="flex-1"),
                 html.Button(
-                    "Fit pipeline ✔️",
+                    children=[
+                        "Fit pipeline ",
+                        html.Span(className="w-3"),
+                        html.I(className="fa-solid fa-check"),
+                    ],
                     id="fit_pipeline",
                     n_clicks=0,
                     className="""
