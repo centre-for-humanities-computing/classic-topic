@@ -15,7 +15,8 @@ from app.components.genre_weight_popup import (genre_weight_element,
                                                popup_container_class,
                                                setting_container_class)
 from app.components.navbar import navbar_button_class
-from app.components.sidebar import sidebar_body_class
+from app.components.settings import settings_hidden, settings_visible
+from app.components.sidebar import sidebar_body_class, sidebar_shade_class
 from app.components.topic_switcher import topic_switcher_class
 from app.layout import view_class
 from app.utils.metadata import fetch_metadata
@@ -272,6 +273,7 @@ def update_topic_names(
 @cb(
     Output("sidebar_body", "className"),
     Output("topic_switcher", "className"),
+    Output("sidebar_shade", "className"),
     Input("sidebar_collapser", "n_clicks"),
     Input("current_view", "data"),
     prevent_initial_call=True,
@@ -287,27 +289,21 @@ def open_close_sidebar(
         Number of times the sidebar collapse button has been clicked
     current_view: int
         Data about the current view.
-
-    Returns
-    -------
-    sidebar_body.className: str
-        Indicates style and position of the sidebar body.
-    topic_switcher.className: str
-        Describes position and style for the topic switcher.
-    sidebar_collapser.children: str
-        The sidebar collapser button icon.
     """
     hide_switcher = " flex" if current_view == "topic" else " hidden"
     is_open = (n_clicks % 2) == 0
+
     if is_open:
         return (
             sidebar_body_class + " translate-x-full",
             topic_switcher_class + " -translate-x-1/2" + hide_switcher,
+            sidebar_shade_class + " bg-opacity-0 hidden",
         )
     else:
         return (
             sidebar_body_class + " translate-x-0",
             topic_switcher_class + " -translate-x-2/3" + hide_switcher,
+            sidebar_shade_class + " bg-opacity-40 block",
         )
 
 
@@ -316,14 +312,17 @@ def open_close_sidebar(
     State("sidebar_collapser", "n_clicks"),
     Input("fit_store", "data"),
     Input("fit_pipeline", "n_clicks"),
+    Input("cancel_pipeline", "n_clicks"),
     prevent_initial_call=True,
 )
 def open_close_sidebar_fitting(
-    current: int, fit_data: Dict, n_clicks: int
+    current: int, fit_data: Dict, fit_clicks: int, cancel_clicks: int
 ) -> int:
     """Opens or closes sidebar when the fit pipeline button is pressed."""
-    if ((ctx.triggered_id == "fit_store") and (fit_data is None)) or (
-        (ctx.triggered_id == "fit_pipeline") and n_clicks
+    if (
+        ((ctx.triggered_id == "fit_store") and (fit_data is None))
+        or ((ctx.triggered_id == "fit_pipeline") and fit_clicks)
+        or ((ctx.triggered_id == "cancel_pipeline") and cancel_clicks)
     ):
         return current + 1
     else:
@@ -772,3 +771,23 @@ def hide_genre_settings(is_genre_on: bool) -> str:
         return setting_container_class
     else:
         return setting_container_class + " hidden"
+
+
+@cb(
+    Output(
+        dict(type="_setting_group_body", index=dash.MATCH),
+        "className",
+    ),
+    Output(
+        dict(type="_setting_group_collapse", index=dash.MATCH),
+        "className",
+    ),
+    Input(dict(type="_setting_group_collapse", index=dash.MATCH), "n_clicks"),
+    prevent_initial_call=True,
+)
+def expand_hide_setting_group(n_clicks: int) -> Tuple[str, str]:
+    is_on = not (n_clicks % 2)
+    if is_on:
+        return settings_visible, "transition-all ease-in rotate-0"
+    else:
+        return "hidden", "transition-all ease-in rotate-180"
