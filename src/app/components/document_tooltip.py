@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from dash import dcc, html
+from dash_extensions.enrich import dcc, html
 
 from app.utils.plots import document_topic_plot
 

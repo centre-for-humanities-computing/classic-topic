@@ -1,5 +1,5 @@
 # type: ignore
-from dash import dcc, html
+from dash_extensions.enrich import dcc, html
 
 from app.components.settings import setting, setting_group
 

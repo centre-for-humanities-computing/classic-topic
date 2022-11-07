@@ -1,31 +1,30 @@
 """Module containing all the callbacks of the application"""
 import base64
 import json
+import sys
 from typing import Callable, Dict, List, Tuple
 
 import dash
 import pandas as pd
 import plotly.graph_objects as go
 from dash import ctx
-from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
+from dash_extensions.enrich import Input, Output, ServersideOutput, State
 
-from app.components.document_tooltip import document_tooltip
 from app.components.genre_weight_popup import (genre_weight_element,
                                                popup_container_class,
                                                setting_container_class)
 from app.components.navbar import navbar_button_class
 from app.components.settings import settings_hidden, settings_visible
 from app.components.sidebar import sidebar_body_class, sidebar_shade_class
-from app.components.topic_switcher import topic_switcher_class
+from app.components.toolbar import toolbar_class
 from app.layout import view_class
 from app.utils.metadata import fetch_metadata
-from app.utils.modelling import (calculate_document_data,
-                                 calculate_genre_importance,
-                                 calculate_top_words, calculate_topic_data,
-                                 calculate_topic_document_importance,
-                                 fit_pipeline, load_corpus,
-                                 serialize_save_data)
+from app.utils.modelling import (calculate_genre_importance,
+                                 calculate_top_words, fit_pipeline,
+                                 load_corpus, prepare_document_data,
+                                 prepare_pipeline_data, prepare_topic_data,
+                                 prepare_transformed_data, serialize_save_data)
 from app.utils.plots import (all_topics_plot, document_topic_plot,
                              documents_plot, topic_plot)
 
@@ -48,13 +47,13 @@ def cb(*args, **kwargs) -> Callable:
 def add_callbacks(app: dash.Dash) -> None:
     """Adds the list of callbacks to a Dash app."""
     for callback in callbacks:
-        dash.callback(app=app, *callback["args"], **callback["kwargs"])(
+        app.callback(*callback["args"], **callback["kwargs"])(
             callback["function"]
         )
 
 
 @cb(
-    Output("fit_store", "data"),
+    ServersideOutput("fit_store", "data"),
     Output("loading", "children"),
     Input("fit_pipeline", "n_clicks"),
     State("select_vectorizer", "value"),
@@ -82,33 +81,6 @@ def update_fit(
 ) -> Tuple[Dict, List]:
     """Updates fit data in the local store when the fit model button
     is pressed.
-
-    Parameters
-    ----------
-    n_clicks: int
-        Number of times the 'fit_pipeline' button has been pressed.
-    vectorizer_name: {'tf-idf', 'bow'}
-        Describes whether a TF-IDF of Bag of Words vectorizer should be fitted.
-    min_df: int
-        Minimum document frequency parameter of the vectorizer.
-    max_df: float
-        Minimum document frequency parameter of the vectorizer.
-    model_name: {'nmf', 'lda', 'lsa'/'lsi', 'dmm'}
-        Specifies which topic model should be trained on the corpus.
-    n_topics: int
-        Number of topics the model should find.
-    genre_weights: dict of str to int
-        Weights of the different genres.
-    n_gram_range: list of int
-        N-gram range parameter of the vectorizer
-
-    Returns
-    -------
-    fit_store.data: dict
-        Data about the model fit.
-    loading.children: list
-        Empty list, is returned so that the loading component activates
-        while the callback is executed.
     """
     # print(ctx.triggered_id)
     if ctx.triggered_id == "upload":
@@ -140,22 +112,29 @@ def update_fit(
     )
     # Inferring data from the fit
     genre_importance = calculate_genre_importance(corpus, pipeline)
-    top_words = calculate_top_words(pipeline, top_n=30)
-    topic_data = calculate_topic_data(corpus, pipeline)
-    document_data = calculate_document_data(corpus, pipeline)
-    document_topic_importance = calculate_topic_document_importance(
-        corpus, pipeline
+    pipeline_data = prepare_pipeline_data(
+        pipeline.vectorizer, pipeline.topic_model
     )
+    transformed_data = prepare_transformed_data(
+        pipeline.vectorizer, pipeline.topic_model, texts=corpus.text
+    )
+    topic_data = prepare_topic_data(**transformed_data, **pipeline_data)
+    document_data = prepare_document_data(corpus=corpus, **transformed_data)
+    pipeline_data.pop("components")
+    fit_data = {
+        "genre_importance": genre_importance.to_dict(),
+        **pipeline_data,
+        **topic_data,
+        **document_data,
+        "loaded": False,
+    }
+    # sizes = {
+    #     key: sys.getsizeof(json.dumps(value))
+    #     for key, value in fit_data.items()
+    # }
+    # print(sizes)
     return (
-        {
-            "genre_importance": genre_importance.to_dict(),
-            "top_words": top_words.to_dict(),
-            "topic_data": topic_data.to_dict(),
-            "document_data": document_data.to_dict(),
-            "document_topic_importance": document_topic_importance,
-            "n_topics": n_topics,
-            "loaded": False,
-        },
+        fit_data,
         [],
     )
 
@@ -272,7 +251,7 @@ def update_topic_names(
 
 @cb(
     Output("sidebar_body", "className"),
-    Output("topic_switcher", "className"),
+    Output("topic_toolbar", "className"),
     Output("sidebar_shade", "className"),
     Input("sidebar_collapser", "n_clicks"),
     Input("current_view", "data"),
@@ -290,19 +269,21 @@ def open_close_sidebar(
     current_view: int
         Data about the current view.
     """
-    hide_switcher = " flex" if current_view == "topic" else " hidden"
+    hide_switcher = (
+        " translate-y-0" if current_view == "topic" else " translate-y-full"
+    )
     is_open = (n_clicks % 2) == 0
 
     if is_open:
         return (
             sidebar_body_class + " translate-x-full",
-            topic_switcher_class + " -translate-x-1/2" + hide_switcher,
+            toolbar_class + hide_switcher,
             sidebar_shade_class + " bg-opacity-0 hidden",
         )
     else:
         return (
             sidebar_body_class + " translate-x-0",
-            topic_switcher_class + " -translate-x-2/3" + hide_switcher,
+            toolbar_class + hide_switcher,
             sidebar_shade_class + " bg-opacity-40 block",
         )
 
@@ -415,21 +396,46 @@ def update_current_topic(
     Output("current_topic_plot", "figure"),
     Input("current_topic", "data"),
     Input("fit_store", "data"),
+    Input("lambda_slider", "value"),
     prevent_initial_call=True,
 )
 def update_current_topic_plot(
-    current_topic: int, fit_store: Dict
+    current_topic: int, fit_store: Dict, alpha: float
 ) -> go.Figure:
     """Updates the plots about the current topic in the topic view
     when the current topic is changed or when a new model is fitted.
     """
-    if current_topic is None or fit_store is None:
+    if current_topic is None or fit_store is None or alpha is None:
         raise PreventUpdate()
-    genre_importance = pd.DataFrame(fit_store["genre_importance"])
-    top_words = pd.DataFrame(fit_store["top_words"])
-    return topic_plot(
-        current_topic, genre_importance=genre_importance, top_words=top_words
+    top_words = calculate_top_words(
+        current_topic=current_topic, top_n=30, alpha=alpha, **fit_store
     )
+    genre_importance = pd.DataFrame(fit_store["genre_importance"])
+    genre_importance = genre_importance[
+        genre_importance.topic == current_topic
+    ]
+    return topic_plot(top_words=top_words, genre_importance=genre_importance)
+
+
+# @cb(
+#     Output("current_topic_plot", "figure"),
+#     Input("current_topic", "data"),
+#     Input("fit_store", "data"),
+#     prevent_initial_call=True,
+# )
+# def update_current_topic_plot(
+#     current_topic: int, fit_store: Dict
+# ) -> go.Figure:
+#     """Updates the plots about the current topic in the topic view
+#     when the current topic is changed or when a new model is fitted.
+#     """
+#     if current_topic is None or fit_store is None:
+#         raise PreventUpdate()
+#     genre_importance = pd.DataFrame(fit_store["genre_importance"])
+#     top_words = pd.DataFrame(fit_store["top_words"])
+#     return topic_plot(
+#         current_topic, genre_importance=genre_importance, top_words=top_words
+#     )
 
 
 @cb(
@@ -446,10 +452,20 @@ def update_all_topics_plot(
 ) -> go.Figure:
     """Updates the topic overview plot when the fit, the topic names or the
     current topic change."""
-    if not topic_names:
+    if not topic_names or fit_data is None:
         # If there's missing data, prevent update.
         raise PreventUpdate()
-    topic_data = pd.DataFrame(fit_data["topic_data"])
+    x, y = fit_data["topic_pos"]
+    size = fit_data["topic_frequency"]
+    topic_id = fit_data["topic_id"]
+    topic_data = pd.DataFrame(
+        {
+            "x": x,
+            "y": y,
+            "size": size,
+            "topic_id": topic_id,
+        }
+    )
     # Mapping topic names over to topic ids with a Series
     # since Series also function as a mapping, you can use them in the .map()
     # method
@@ -474,7 +490,7 @@ def update_all_documents_plot(
 ) -> go.Figure:
     """Updates the document overview plot when a new model is fitted or when
     topic names are changed"""
-    if not topic_names:
+    if not topic_names or fit_data is None:
         # If there's missing data, prevent update.
         raise PreventUpdate()
     document_data = pd.DataFrame(fit_data["document_data"])
@@ -555,24 +571,6 @@ def fetch_data(n_intervals: int) -> Dict:
     return metadata.to_dict()
 
 
-# @cb(
-#     Output("genre_weights_dropdown", "value"),
-#     Output("genre_weights_dropdown", "options"),
-#     Input("metadata", "data"),
-#     prevent_initial_call=True,
-# )
-# def set_genre_weight_dropdown_options(
-#     metadata_store: Dict,
-# ) -> Tuple[str, List[str]]:
-#     """Fetches genre names from the metadata chart, and
-#     disables updating afterwards"""
-#     metadata: pd.DataFrame = pd.DataFrame.from_dict(metadata_store)
-#     genres = metadata.group.unique()
-#     genres = genres.tolist()
-#     print(f"Fetched genres: {genres}")
-#     return genres[0], genres
-
-
 @cb(
     Output("genre_weight_popup", "children"),
     Input("metadata", "data"),
@@ -583,50 +581,6 @@ def update_genre_weights_popup_children(metadata_store: Dict) -> List:
     metadata: pd.DataFrame = pd.DataFrame.from_dict(metadata_store)
     genres = metadata.group.unique()
     return [genre_weight_element(genre) for genre in genres]
-
-
-# @cb(
-#     Output("genre_weights_slider", "value"),
-#     Input("genre_weights_dropdown", "value"),
-#     State("genre_weights", "data"),
-#     prevent_initial_call=True,
-# )
-# def update_genre_weights_slider_value(
-#     selected: str, weights: Dict[str, int]
-# ) -> int:
-#     """Updates genre weight slider value when another genre is selected"""
-#     if not selected or not weights:
-#         raise PreventUpdate()
-#     return weights[selected]
-
-
-# @cb(
-#     Output("genre_weights", "data"),
-#     Input("genre_weights_dropdown", "options"),
-#     Input("genre_weights_slider", "value"),
-#     State("genre_weights_dropdown", "value"),
-#     State("genre_weights", "data"),
-#     prevent_initial_call=True,
-# )
-# def update_genre_weights(
-#     genre_names: List[str],
-#     update_value: int,
-#     selected: str,
-#     prev_weights: Dict[str, int],
-# ) -> Dict[str, int]:
-#     """Updates genre weights."""
-#     # print("Updating genre weights")
-#     if not genre_names:
-#         raise PreventUpdate()
-#     if ctx.triggered_id == "genre_weights_dropdown":
-#         genre_weights = {genre_name: 1 for genre_name in genre_names}
-#         return genre_weights
-#     if ctx.triggered_id == "genre_weights_slider":
-#         if not selected:
-#             raise PreventUpdate()
-#         genre_weights = {**prev_weights, selected: update_value}
-#         return genre_weights
-#     raise PreventUpdate()
 
 
 @cb(
@@ -700,45 +654,27 @@ def select_document(selected_points: Dict) -> int:
     State("topic_names", "data"),
 )
 def update_document_inspector(
-    doc_id: int, metadata_store: Dict, fit_data: Dict, topic_names: List[str]
+    id_nummer: int,
+    metadata_store: Dict,
+    fit_data: Dict,
+    topic_names: List[str],
 ) -> Tuple[str, str, go.Figure, str]:
-    if doc_id is None:
+    if id_nummer is None:
         raise PreventUpdate()
-    doc_id = int(doc_id)
-    metadata = pd.DataFrame.from_dict(metadata_store)
-    metadata = metadata.assign(id_nummer=metadata.id_nummer.astype(int))
-    metadata = metadata.set_index("id_nummer")
-    data = metadata.join(corpus.set_index("id_nummer"), how="inner")
-    doc_data = data.loc[doc_id]
-    importances = fit_data["document_topic_importance"]
-    fig = document_topic_plot(importances[str(doc_id)], topic_names)
-    genre = f"Genre: {doc_data.tlg_genre}"
-    group = f"Group: {doc_data.group}"
-    return (genre, group, fig, doc_data.text)
-
-
-# @cb(
-#     Output("documents_tooltip", "show"),
-#     Output("documents_tooltip", "bbox"),
-#     Output("documents_tooltip", "children"),
-#     Input("all_documents_plot", "hoverData"),
-#     State("fit_store", "data"),
-#     State("topic_names", "data"),
-# )
-# def show_document_tooltip(
-#     hover_data: Dict, fit_data: Dict, topic_names: List[str]
-# ):
-#     if not hover_data:
-#         return False, dash.no_update, dash.no_update
-#     point, *_ = hover_data["points"]
-#     bounding_box = point["bbox"]
-#     work, author, group, tlg_genre, _, text_id = point["customdata"]
-#     # print(importances)
-#     children = document_tooltip(
-#         work,
-#         author,
-#     )
-#     return True, bounding_box, children
+    id_nummer = int(id_nummer)
+    document_data = (
+        pd.DataFrame(fit_data["document_data"])
+        .set_index("id_nummer")
+        .loc[id_nummer]
+    )
+    i_doc = document_data.i_doc
+    importances = pd.DataFrame(fit_data["document_topic_importance"])
+    print(importances)
+    importances = importances[importances.i_doc == i_doc]
+    fig = document_topic_plot(importances, topic_names)
+    genre = f"Genre: {document_data.tlg_genre}"
+    group = f"Group: {document_data.group}"
+    return (genre, group, fig, document_data.text)
 
 
 @cb(

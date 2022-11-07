@@ -1,7 +1,7 @@
 """Module for training topic pipelines and inferring data for plotting."""
 
 import json
-from typing import Dict, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -10,6 +10,7 @@ from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.manifold import TSNE
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import normalize
 from tweetopic import DMM, TopicPipeline
 
 from app.utils.metadata import fetch_metadata
@@ -57,6 +58,9 @@ def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
     return df.loc[new_index]
 
 
+MAX_FEATURES = 100_000
+
+
 def fit_pipeline(
     corpus: pd.DataFrame,
     metadata: pd.DataFrame,
@@ -99,7 +103,10 @@ def fit_pipeline(
     # Setting up pipeline
     topic_model = TOPIC_MODELS[model_name](n_components=n_topics)
     vectorizer = VECTORIZERS[vectorizer_name](
-        min_df=min_df, max_df=max_df, ngram_range=n_gram_range
+        min_df=min_df,
+        max_df=max_df,
+        ngram_range=n_gram_range,
+        max_features=MAX_FEATURES,
     )
     pipeline = TopicPipeline(vectorizer=vectorizer, topic_model=topic_model)
     # Weighting the different groups
@@ -112,44 +119,45 @@ def fit_pipeline(
     return pipeline
 
 
-def calculate_topic_document_importance(
-    corpus: pd.DataFrame, pipeline: TopicPipeline
-) -> Dict[int, Dict[int, float]]:
-    """Calculates topic importances for each document.
+def topic_document_importance(
+    document_topic_matrix: np.ndarray,
+    document_id: np.ndarray,
+) -> Dict:
+    """Calculates topic importances for each document."""
+    coo = spr.coo_array(document_topic_matrix)
+    topic_doc_imp = pd.DataFrame(
+        dict(i_doc=coo.row, topic_id=coo.col, importance=coo.data)
+    )
+    return topic_doc_imp.to_dict()
 
-    Parameters
-    ----------
-    corpus: DataFrame
-        Data frame containing the cleaned corpus with ids.
-    pipeline: TopicPipeline
-        Fitted pipeline for topic modelling.
 
-    Returns
-    -------
-    dict of int to (dict of int to float)
-       Mapping of document ids to a dictionary of topic ids to importances.
-    """
-    pred = pipeline.transform(corpus.text)
-    lil = spr.lil_matrix(pred)
-    importance_list = []
-    for topic_ids, importances in zip(lil.rows, lil.data):
-        importance_list.append(
-            {
-                topic_id: importance
-                for topic_id, importance in zip(topic_ids, importances)
-            }
-        )
-    importance_dict = {
-        document_id: topics
-        for document_id, topics in zip(corpus.id_nummer, importance_list)
-    }
-    return importance_dict
+# def topic_document_importance(
+#     document_topic_matrix: np.ndarray,
+#     document_id: np.ndarray,
+# ) -> Dict[int, Dict[int, float]]:
+#     """Calculates topic importances for each document."""
+#     lil = spr.lil_matrix(document_topic_matrix)
+#     importance_list = []
+#     for topic_ids, importances in zip(lil.rows, lil.data):
+#         importance_list.append(
+#             {
+#                 topic_id: importance
+#                 for topic_id, importance in zip(topic_ids, importances)
+#             }
+#         )
+#     importance_dict = {
+#         document_id: topics
+#         for document_id, topics in zip(document_id, importance_list)
+#     }
+#     return importance_dict
+#
 
 
 def calculate_genre_importance(
     corpus: pd.DataFrame, pipeline: TopicPipeline
 ) -> pd.DataFrame:
-    """Calculates for which groups in the corpus are the given topics specifically important.
+    """Calculates for which groups in the corpus are the
+    given topics specifically important.
 
     Parameters
     ----------
@@ -209,105 +217,136 @@ def calculate_genre_importance(
     return importance
 
 
+def word_relevance(
+    topic_id: int,
+    term_frequency: np.ndarray,
+    topic_term_frequency: np.ndarray,
+    alpha: float,
+) -> np.ndarray:
+    """Returns relevance scores for each topic for each word.
+
+    Parameters
+    ----------
+    components: ndarray of shape (n_topics, n_vocab)
+        Topic word probability matrix.
+    alpha: float
+        Weight parameter.
+
+    Returns
+    -------
+    ndarray of shape (n_topics, n_vocab)
+        Topic word relevance matrix.
+    """
+    probability = np.log(topic_term_frequency[topic_id])
+    probability[probability == -np.inf] = np.nan
+    lift = np.log(topic_term_frequency[topic_id] / term_frequency)
+    lift[lift == -np.inf] = np.nan
+    relevance = alpha * probability + (1 - alpha) * lift
+    return relevance
+
+
 def calculate_top_words(
-    pipeline: TopicPipeline, top_n: int = 30
+    current_topic: int,
+    top_n: int,
+    alpha: float,
+    term_frequency: np.ndarray,
+    topic_term_frequency: np.ndarray,
+    vocab: np.ndarray,
+    **kwargs,
 ) -> pd.DataFrame:
-    """Arranges top N words of each topic to a DataFrame.
-
-    Parameters
-    ----------
-    pipeline: TopicPipeline
-        Fitted pipeline for topic modelling.
-    top_n: int, default 30
-        Number of words to include for each topic.
-
-    Returns
-    -------
-    DataFrame
-        Top N words for each topic with importance scores.
-
-    Note
-    ----
-    Importance scores are exclusively calculated from the topic model's
-    'components_' attribute and do not have anything to do with the empirical
-    distribution of words in each topic. This has to be kept in mind, as some models
-    keep counts in their 'components_' attribute (e.g. DMM).
-    Would probably be smart to reconsider this in the future.
-    """
-    # Obtaining top N words for each topic
-    top = pipeline.top_words(top_n=top_n)
-    overall_importance = pipeline.topic_model.components_.sum(axis=0)
-    vocab = pipeline.vectorizer.vocabulary_  # type: ignore
-    # Wrangling the data into tuple records
-    records = []
-    for i_topic, topic in enumerate(top):
-        for word, importance in topic.items():
-            overall = overall_importance[vocab[word]]
-            records.append((i_topic, word, importance, overall))
-    # Adding to a dataframe
-    top_words = pd.DataFrame(
-        records, columns=["topic", "word", "importance", "overall_importance"]
+    """Arranges top N words by relevance for the given topic into a DataFrame."""
+    vocab = np.array(vocab)
+    term_frequency = np.array(term_frequency)
+    # topic_term_frequency = spr.csr_matrix(*topic_term_frequency)
+    relevance = word_relevance(
+        current_topic, term_frequency, topic_term_frequency, alpha=alpha
     )
-    return top_words
+    highest = np.argpartition(-relevance, top_n)[:top_n]
+    res = pd.DataFrame(
+        {
+            "word": vocab[highest],
+            "importance": topic_term_frequency[current_topic, highest],
+            "overall_importance": term_frequency[highest],
+            "relevance": relevance[highest],
+        }
+    )
+    return res
 
 
-def calculate_topic_data(
-    corpus: pd.DataFrame, pipeline: TopicPipeline
-) -> pd.DataFrame:
-    """Calculates topic positions in 2D space as well as topic sizes
-    based on their empirical importance in the corpus.
+def prepare_pipeline_data(vectorizer: Any, topic_model: Any) -> Dict:
+    """Prepares data about the pipeline for storing
+    in local store and plotting"""
+    n_topics = topic_model.n_components
+    vocab = vectorizer.get_feature_names_out()
+    components = topic_model.components_
+    # Making sure components are normalized
+    # (remember this is not necessarily the case with some models)
+    components = normalize(components, norm="l1", axis=1)
+    return {
+        "n_topics": n_topics,
+        "vocab": vocab,
+        "components": components,
+    }
 
-    Parameters
-    ----------
-    corpus: DataFrame
-        Data frame containing the cleaned corpus with ids.
-    pipeline: TopicPipeline
-        Fitted pipeline for topic modelling.
 
-    Returns
-    -------
-    DataFrame
-        Data about topic sizes and positions.
-    """
-    # Calculating topic predictions for each document.
-    pred = pipeline.transform(corpus.text)
-    _, n_topics = pred.shape  # type: ignore
-    # Calculating topic size from the empirical importance of topics
-    size = pred.sum(axis=0)  # type: ignore
-    components = pipeline.topic_model.components_
-    # Calculating topic positions with t-SNE
-    x, y = (
+def prepare_transformed_data(
+    vectorizer: Any, topic_model: Any, texts: Iterable[str]
+) -> Dict:
+    """Runs pipeline on the given texts and returns the document term matrix
+    and the topic document distribution."""
+    # Computing doc-term matrix for corpus
+    document_term_matrix = vectorizer.transform(texts)
+    # Transforming corpus with topic model for empirical topic data
+    document_topic_matrix = topic_model.transform(document_term_matrix)
+    return {
+        "document_term_matrix": document_term_matrix,
+        "document_topic_matrix": document_topic_matrix,
+    }
+
+
+def prepare_topic_data(
+    document_term_matrix: np.ndarray,
+    document_topic_matrix: np.ndarray,
+    components: np.ndarray,
+    n_topics: int,
+    **kwargs,
+) -> Dict:
+    """Prepares data about topics for plotting."""
+    components = np.array(components)
+    # Calculating document lengths
+    document_lengths = document_term_matrix.sum(axis=1)
+    # Calculating an estimate of empirical topic frequencies
+    topic_frequency = (document_topic_matrix.T * document_lengths).sum(axis=1)
+    topic_frequency = np.squeeze(np.asarray(topic_frequency))
+    # Calculating empirical estimate of term-topic frequencies
+    # shape: (n_topics, n_vocab)
+    topic_term_frequency = (components.T * topic_frequency).T
+    # Empirical term frequency
+    term_frequency = topic_term_frequency.sum(axis=0)
+    term_frequency = np.squeeze(np.asarray(term_frequency))
+    # Determining topic positions with TSNE
+    topic_pos = (
         TSNE(perplexity=5, init="pca", learning_rate="auto")
         .fit_transform(components)
         .T
     )
-    return pd.DataFrame(
-        {"topic_id": range(n_topics), "x": x, "y": y, "size": size}
-    )
+    topic_id = np.arange(n_topics)
+    return {
+        "topic_id": topic_id,
+        "topic_frequency": topic_frequency,
+        "topic_pos": topic_pos,
+        "term_frequency": term_frequency,
+        "topic_term_frequency": topic_term_frequency,
+    }
 
 
-def calculate_document_data(
-    corpus: pd.DataFrame, pipeline: TopicPipeline
-) -> pd.DataFrame:
-    """Calculates document positions in 3D space as well
-    as predictions for dominant topic.
-
-    Parameters
-    ----------
-    corpus: DataFrame
-        Data frame containing the cleaned corpus with ids.
-    pipeline: TopicPipeline
-        Fitted pipeline for topic modelling.
-
-    Returns
-    -------
-    DataFrame
-        Data about document positions and topic predictions + metadata.
-    """
-    # Calculating topic predictions for each document.
-    pred = np.argmax(pipeline.transform(corpus.text), axis=1)  # type: ignore
-    # Obtaining document-term matrix
-    dtm = pipeline.vectorizer.transform(corpus.text)
+def prepare_document_data(
+    corpus: pd.DataFrame,
+    document_term_matrix: np.ndarray,
+    document_topic_matrix: np.ndarray,
+    **kwargs,
+) -> Dict:
+    dominant_topic = np.argmax(document_topic_matrix, axis=1)
     # Setting up dimensionality reduction pipeline
     dim_red_pipeline = Pipeline(
         [
@@ -315,17 +354,27 @@ def calculate_document_data(
             ("t-SNE", TSNE(3, init="random", learning_rate="auto")),
         ]
     )
-    # Calculating dimensions in 3D space
-    x, y, z = dim_red_pipeline.fit_transform(dtm).T
-    documents = corpus.assign(x=x, y=y, z=z, topic_id=pred).drop(
-        columns="text"
+    # Calculating positions in 3D space
+    x, y, z = dim_red_pipeline.fit_transform(document_term_matrix).T
+    documents = corpus.assign(
+        x=x,
+        y=y,
+        z=z,
+        i_doc=np.arange(len(corpus.index)),
+        topic_id=dominant_topic,
     )
     md = fetch_metadata()
     md = md[~md.skal_fjernes]
     md = md[["id_nummer", "værk", "forfatter", "group", "tlg_genre"]]
-    documents = documents.merge(md, on="id_nummer", how="inner")
+    documents = documents.merge(md, on="id_nummer", how="left")
     documents = documents.assign(group=documents.group.fillna(""))
-    return documents
+    importance_sparse = topic_document_importance(
+        document_topic_matrix, document_id=documents.id_nummer
+    )
+    return {
+        "document_data": documents.to_dict(),
+        "document_topic_importance": importance_sparse,
+    }
 
 
 def serialize_save_data(fit_data: Dict, topic_names: List[str]) -> str:

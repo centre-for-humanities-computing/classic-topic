@@ -1,6 +1,6 @@
 # type: ignore
 """Module describing the navigation bar component of the app."""
-from dash import dcc, html
+from dash_extensions.enrich import dcc, html
 
 navbar_button_class = """
     p-3 text-xl transition-all ease-in

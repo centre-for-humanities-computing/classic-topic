@@ -7,27 +7,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-def topic_plot(
-    topic: int, genre_importance: pd.DataFrame, top_words: pd.DataFrame
-):
-    """Plots genre and word importances for currently selected topic.
-
-    Parameters
-    ----------
-    topic: int
-        Index of the topic to be displayed.
-    genre_importance: DataFrame
-        Data about genre importances.
-    top_words: DataFrame
-        Data about word importances for each topic.
-
-    Returns
-    -------
-    Figure
-        Piechart of genre importances and bar chart of word importances.
-    """
-    genre_importance = genre_importance[genre_importance.topic == topic]
-    top_words = top_words[top_words.topic == topic]
+def topic_plot(genre_importance: pd.DataFrame, top_words: pd.DataFrame):
+    """Plots genre and word importances for currently selected topic."""
+    top_words = top_words.sort_values("relevance", ascending=False)
     genre_trace = go.Pie(
         values=genre_importance.importance,
         labels=genre_importance.group,
@@ -72,7 +54,8 @@ def topic_plot(
 
 
 def all_topics_plot(topic_data: pd.DataFrame, current_topic: int) -> go.Figure:
-    """Plots all topics on a bubble plot with estimated distances and importances.
+    """Plots all topics on a bubble plot with estimated
+    distances and importances.
 
     Parameters
     ----------
@@ -103,6 +86,7 @@ def all_topics_plot(topic_data: pd.DataFrame, current_topic: int) -> go.Figure:
         showlegend=False,
         hovermode="closest",
         plot_bgcolor="white",
+        dragmode="pan",
     )
     fig.update_traces(textposition="top center", hovertemplate="")
     fig.update_coloraxes(showscale=False)
@@ -205,7 +189,7 @@ def documents_plot(document_data: pd.DataFrame) -> go.Figure:
 
 
 def document_topic_plot(
-    topic_importances: Dict[int, float],
+    topic_importances: pd.DataFrame,
     topic_names: List[str],
 ) -> go.Figure:
     """Plots topic importances for a selected document.
@@ -222,13 +206,9 @@ def document_topic_plot(
     Figure
         Pie chart of topic importances for each document.
     """
-    importances = pd.DataFrame.from_records(
-        list(topic_importances.items()), columns=["topic_id", "importance"]
-    )
-    importances = importances.assign(topic_id=importances.topic_id.astype(int))
     name_mapping = pd.Series(topic_names)
-    importances = importances.assign(
-        topic_name=importances.topic_id.map(name_mapping)
+    importances = topic_importances.assign(
+        topic_name=topic_importances.topic_id.astype(int).map(name_mapping)
     )
     fig = px.pie(
         importances,
@@ -236,6 +216,7 @@ def document_topic_plot(
         names="topic_name",
         color_discrete_sequence=px.colors.sequential.RdBu,
     )
+    print(importances)
     fig.update_traces(textposition="inside", textinfo="label")
     fig.update_layout(
         showlegend=False,

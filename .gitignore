@@ -5,3 +5,4 @@
 *.ipynb
 *.html
 *mess*
+*file_system_store/

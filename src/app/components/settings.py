@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from dash import dcc, html
+from dash_extensions.enrich import dcc, html
 
 settings_visible = "flex-1 flex-col flex items-stretch justify-evenly"
 settings_hidden = "hidden"

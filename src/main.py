@@ -1,9 +1,10 @@
 """Main script creating the app, adding layout and callbacks and running the server"""
-import dash
+from dash_extensions.enrich import Dash
+
 from app.callbacks import add_callbacks
 from app.layout import add_layout
 
-app = dash.Dash(
+app = Dash(
     __name__,
     title="Topic Modelling",
     external_scripts=[

@@ -2,15 +2,13 @@
 """Module describing the layout of the app"""
 
 import dash
-from dash import dcc, html
+from dash_extensions.enrich import dcc, html
 
 from app.components.document_inspector import document_inspector
-from app.components.navbar import navbar
-from app.components.save_load import save_load
-from app.components.sidebar import sidebar
-from app.components.topic_switcher import topic_switcher
 from app.components.genre_weight_popup import genre_weight_popup
-
+from app.components.navbar import navbar
+from app.components.sidebar import sidebar
+from app.components.toolbar import topic_toolbar
 
 view_class = "flex-row items-stretch flex-1 mr-16 z-0"
 
@@ -33,10 +31,18 @@ layout = html.Div(
             className=view_class + " flex mb-16",
             children=[
                 dcc.Graph(
-                    id="all_topics_plot", className="flex-1 basis-1/3 mt-10"
+                    id="all_topics_plot",
+                    className="flex-1 basis-1/3 mt-10",
+                    responsive=True,
+                    config=dict(scrollZoom=True),
+                    animate=True,
                 ),
                 dcc.Graph(
-                    id="current_topic_plot", className="flex-1 basis-2/3"
+                    id="current_topic_plot",
+                    className="flex-1 basis-2/3",
+                    responsive=True,
+                    animate=True,
+                    animation_options=dict(frame=dict(redraw=True))
                 ),
             ],
         ),
@@ -47,7 +53,8 @@ layout = html.Div(
                 document_inspector,
                 dcc.Graph(
                     id="all_documents_plot",
-                    className="flex-1",
+                    className="flex-none basis-2/3",
+                    responsive=True,
                 ),
                 dcc.Tooltip(id="documents_tooltip"),
             ],
@@ -58,11 +65,11 @@ layout = html.Div(
             fullscreen=True,
             children=html.Div(id="loading"),
         ),
-        topic_switcher,
+        topic_toolbar,
         sidebar,
         navbar,
-        save_load,
-        genre_weight_popup
+        # save_load,
+        genre_weight_popup,
     ],
 )
 

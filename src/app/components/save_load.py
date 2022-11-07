@@ -1,7 +1,7 @@
 # type: ignore
 """Component for saving and loading fit data."""
 
-from dash import dcc, html
+from dash_extensions.enrich import dcc, html
 
 button_class = """
     text-xl transition-all ease-in 
