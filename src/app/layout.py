@@ -19,7 +19,6 @@ layout = html.Div(
         dcc.Store(id="topic_names", data=[], storage_type="session"),
         dcc.Store(id="current_topic", data=0),
         dcc.Store(id="genre_weights", storage_type="session"),
-        dcc.Store(id="metadata", storage_type="session"),
         dcc.Store(
             id="current_view",
             storage_type="session",

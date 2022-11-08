@@ -61,15 +61,28 @@ def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
 MAX_FEATURES = 100_000
 
 
+def prepare_corpus(
+    corpus: pd.DataFrame, genre_weights: Dict[str, int]
+) -> pd.DataFrame:
+    """Prepares corpus for training with the given genre weights"""
+    md = fetch_metadata()
+    md = md[~md.skal_fjernes]
+    md = md[["id_nummer", "værk", "forfatter", "group", "tlg_genre"]]
+    md["group"] = md.group.fillna("Rest")
+    corpus = corpus.merge(md, on="id_nummer", how="inner")
+    corpus = corpus.assign(weight=corpus.group.map(genre_weights))
+    # Weighting the different groups
+    corpus = repeat_rows(corpus, weight_col="weight")
+    return corpus
+
+
 def fit_pipeline(
     corpus: pd.DataFrame,
-    metadata: pd.DataFrame,
     vectorizer_name: str,
     min_df: int,
     max_df: float,
     model_name: str,
     n_topics: int,
-    genre_weights: Dict[str, int],
     n_gram_range: Tuple[int, int],
 ) -> TopicPipeline:
     """Fits topic pipeline with the given parameters.
@@ -78,8 +91,6 @@ def fit_pipeline(
     ----------
     corpus: DataFrame
         Corpus data containing texts and ids.
-    metadata: DataFrame
-        Metadata about the corpus.
     vectorizer_name: {'tf-idf', 'bow'}
         Describes whether a TF-IDF of Bag of Words vectorizer should be fitted.
     min_df: int
@@ -90,8 +101,6 @@ def fit_pipeline(
         Specifies which topic model should be trained on the corpus.
     n_topics: int
         Number of topics the model should find.
-    genre_weights: dict of str to int
-        Mapping of genre names to weights.
     n_gram_range: tuple of (int, int)
         N-gram range parameter of the vectorizer
 
@@ -109,11 +118,6 @@ def fit_pipeline(
         max_features=MAX_FEATURES,
     )
     pipeline = TopicPipeline(vectorizer=vectorizer, topic_model=topic_model)
-    # Weighting the different groups
-    metadata = metadata[["id_nummer", "group"]]
-    corpus = corpus.merge(metadata, on="id_nummer", how="inner")
-    corpus = corpus.assign(weight=corpus.group.map(genre_weights))
-    corpus = repeat_rows(corpus, weight_col="weight")
     # Fitting the pipeline
     pipeline = pipeline.fit(corpus.text)
     return pipeline
@@ -129,28 +133,6 @@ def topic_document_importance(
         dict(i_doc=coo.row, topic_id=coo.col, importance=coo.data)
     )
     return topic_doc_imp.to_dict()
-
-
-# def topic_document_importance(
-#     document_topic_matrix: np.ndarray,
-#     document_id: np.ndarray,
-# ) -> Dict[int, Dict[int, float]]:
-#     """Calculates topic importances for each document."""
-#     lil = spr.lil_matrix(document_topic_matrix)
-#     importance_list = []
-#     for topic_ids, importances in zip(lil.rows, lil.data):
-#         importance_list.append(
-#             {
-#                 topic_id: importance
-#                 for topic_id, importance in zip(topic_ids, importances)
-#             }
-#         )
-#     importance_dict = {
-#         document_id: topics
-#         for document_id, topics in zip(document_id, importance_list)
-#     }
-#     return importance_dict
-#
 
 
 def calculate_genre_importance(
@@ -171,14 +153,10 @@ def calculate_genre_importance(
     DataFrame
         Data about topic importances for each group.
     """
-    # Selecting important works by joining with metadata
-    # Only those get selected, which are assigned to a group
-    md = fetch_metadata()
-    md = md[["id_nummer", "group"]].dropna().set_index("id_nummer")
     # Removing unnecessary groups
     # NOTE: This will be removed in the future
-    md = md[
-        ~md.group.isin(
+    important_works = corpus[
+        ~corpus.group.isin(
             [
                 "Jewish Philosophy",
                 "Jewish Pseudepigrapha",
@@ -187,7 +165,6 @@ def calculate_genre_importance(
             ]
         )
     ]
-    important_works = corpus.join(md, how="inner")
     # Obtaining probabilities of each important working
     # belonging to a certain topic.
     probs = pipeline.transform(important_works.text)
@@ -363,11 +340,6 @@ def prepare_document_data(
         i_doc=np.arange(len(corpus.index)),
         topic_id=dominant_topic,
     )
-    md = fetch_metadata()
-    md = md[~md.skal_fjernes]
-    md = md[["id_nummer", "værk", "forfatter", "group", "tlg_genre"]]
-    documents = documents.merge(md, on="id_nummer", how="left")
-    documents = documents.assign(group=documents.group.fillna(""))
     importance_sparse = topic_document_importance(
         document_topic_matrix, document_id=documents.id_nummer
     )

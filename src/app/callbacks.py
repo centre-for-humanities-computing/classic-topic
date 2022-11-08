@@ -22,9 +22,10 @@ from app.layout import view_class
 from app.utils.metadata import fetch_metadata
 from app.utils.modelling import (calculate_genre_importance,
                                  calculate_top_words, fit_pipeline,
-                                 load_corpus, prepare_document_data,
-                                 prepare_pipeline_data, prepare_topic_data,
-                                 prepare_transformed_data, serialize_save_data)
+                                 load_corpus, prepare_corpus,
+                                 prepare_document_data, prepare_pipeline_data,
+                                 prepare_topic_data, prepare_transformed_data,
+                                 serialize_save_data)
 from app.utils.plots import (all_topics_plot, document_topic_plot,
                              documents_plot, topic_plot)
 
@@ -64,7 +65,6 @@ def add_callbacks(app: dash.Dash) -> None:
     Input("upload", "contents"),
     State("genre_weights", "data"),
     State("n_gram_slider", "value"),
-    State("metadata", "data"),
     prevent_initial_call=True,
 )
 def update_fit(
@@ -77,7 +77,6 @@ def update_fit(
     upload_contents: List,
     genre_weights: Dict[str, int],
     n_gram_range: List[int],
-    metadata_store: Dict,
 ) -> Tuple[Dict, List]:
     """Updates fit data in the local store when the fit model button
     is pressed.
@@ -96,30 +95,29 @@ def update_fit(
     # If the button has not actually been clicked prevent updating
     if not n_clicks or not genre_weights:
         raise PreventUpdate
+    print(genre_weights)
+    corpus_ = prepare_corpus(corpus, genre_weights)
     # Fitting the topic pipeline
-    metadata = pd.DataFrame.from_dict(metadata_store)
     n_gram_low, n_gram_high, *_ = n_gram_range
     pipeline = fit_pipeline(
-        metadata=metadata,
-        corpus=corpus,
+        corpus=corpus_,
         vectorizer_name=vectorizer_name,
         min_df=min_df,
         max_df=max_df,
         model_name=model_name,
         n_topics=n_topics,
-        genre_weights=genre_weights,
         n_gram_range=(n_gram_low, n_gram_high),
     )
     # Inferring data from the fit
-    genre_importance = calculate_genre_importance(corpus, pipeline)
+    genre_importance = calculate_genre_importance(corpus_, pipeline)
     pipeline_data = prepare_pipeline_data(
         pipeline.vectorizer, pipeline.topic_model
     )
     transformed_data = prepare_transformed_data(
-        pipeline.vectorizer, pipeline.topic_model, texts=corpus.text
+        pipeline.vectorizer, pipeline.topic_model, texts=corpus_.text
     )
     topic_data = prepare_topic_data(**transformed_data, **pipeline_data)
-    document_data = prepare_document_data(corpus=corpus, **transformed_data)
+    document_data = prepare_document_data(corpus=corpus_, **transformed_data)
     pipeline_data.pop("components")
     fit_data = {
         "genre_importance": genre_importance.to_dict(),
@@ -150,28 +148,7 @@ def update_fit(
     prevent_initial_call=True,
 )
 def update_topic_switcher(topic_names: List[str], current_topic: int):
-    """Updates the topic switcher component when the current topic changes.
-
-    Parameters
-    ----------
-    topic_names: list of str
-        Store data about topic names.
-    current_topic: int
-        Store data about currently selected topic.
-
-    Returns
-    -------
-    next_topic.children
-        Text that should be displayed on the next topic button.
-    next_topic.disabled
-        Whether the next topic button should be disabled or not.
-    prev_topic.children
-        Text that should be displayed on the previous topic button.
-    prev_topic.disabled
-        Whether the previous topic button should be disabled or not.
-    topic_name.value
-        List of topic names.
-    """
+    """Updates the topic switcher component when the current topic changes."""
     if not topic_names:
         raise PreventUpdate
     n_topics = len(topic_names)
@@ -417,27 +394,6 @@ def update_current_topic_plot(
     return topic_plot(top_words=top_words, genre_importance=genre_importance)
 
 
-# @cb(
-#     Output("current_topic_plot", "figure"),
-#     Input("current_topic", "data"),
-#     Input("fit_store", "data"),
-#     prevent_initial_call=True,
-# )
-# def update_current_topic_plot(
-#     current_topic: int, fit_store: Dict
-# ) -> go.Figure:
-#     """Updates the plots about the current topic in the topic view
-#     when the current topic is changed or when a new model is fitted.
-#     """
-#     if current_topic is None or fit_store is None:
-#         raise PreventUpdate()
-#     genre_importance = pd.DataFrame(fit_store["genre_importance"])
-#     top_words = pd.DataFrame(fit_store["top_words"])
-#     return topic_plot(
-#         current_topic, genre_importance=genre_importance, top_words=top_words
-#     )
-
-
 @cb(
     Output("all_topics_plot", "figure"),
     Input("fit_store", "data"),
@@ -560,26 +516,19 @@ def download_data(
 
 
 @cb(
-    Output("metadata", "data"),
-    Input("fetch_data", "n_intervals"),
-)
-def fetch_data(n_intervals: int) -> Dict:
-    """Fetches metadata and puts it into a dash store."""
-    # print("Fetching metadata")
-    metadata = fetch_metadata()
-    metadata = metadata.assign(group=metadata.group.fillna("Rest"))
-    return metadata.to_dict()
-
-
-@cb(
     Output("genre_weight_popup", "children"),
-    Input("metadata", "data"),
+    Input("fit_store", "data"),
     prevent_initial_call=True,
 )
-def update_genre_weights_popup_children(metadata_store: Dict) -> List:
+def update_genre_weights_popup_children(fit_data: Dict) -> List:
     """Updates the children of the genre weights popup"""
-    metadata: pd.DataFrame = pd.DataFrame.from_dict(metadata_store)
-    genres = metadata.group.unique()
+    if fit_data is None:
+        md = fetch_metadata().dropna(subset="group")
+        genres = md.group.unique().tolist() + ["Rest"]
+    else:
+        documents = pd.DataFrame.from_dict(fit_data["document_data"])
+        genres = documents.group.unique()
+    print("Genres: ", genres)
     return [genre_weight_element(genre) for genre in genres]
 
 
@@ -618,15 +567,17 @@ def update_genre_weights(
 
 @cb(
     Output("document_selector", "options"),
-    Input("metadata", "data"),
+    Input("fit_store", "data"),
 )
-def update_document_selector_options(metadata_store: Dict) -> Dict[int, str]:
-    metadata = pd.DataFrame.from_dict(metadata_store)
-    metadata = metadata.merge(corpus, on="id_nummer", how="inner")
+def update_document_selector_options(fit_data: Dict) -> Dict[int, str]:
+    if fit_data is None:
+        raise PreventUpdate
+    documents = pd.DataFrame.from_dict(fit_data["document_data"])
+    documents = documents.merge(corpus, on="id_nummer", how="inner")
     return {
         int(id_nummer): f"{work} - {author}"
         for id_nummer, work, author in zip(
-            metadata.id_nummer, metadata.værk, metadata.forfatter
+            documents.id_nummer, documents.værk, documents.forfatter
         )
     }
 
@@ -649,13 +600,11 @@ def select_document(selected_points: Dict) -> int:
     Output("document_topics_graph", "figure"),
     Output("document_content", "children"),
     Input("document_selector", "value"),
-    State("metadata", "data"),
     State("fit_store", "data"),
     State("topic_names", "data"),
 )
 def update_document_inspector(
     id_nummer: int,
-    metadata_store: Dict,
     fit_data: Dict,
     topic_names: List[str],
 ) -> Tuple[str, str, go.Figure, str]:
