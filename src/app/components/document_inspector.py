@@ -5,7 +5,7 @@ from dash_extensions.enrich import dcc, html
 from app.components.settings import setting_group
 
 document_inspector = html.Div(
-    className="""basis-1/3 flex-none flex-col bg-white shadow
+    className="""basis-1/3 flex-1 flex-col bg-white shadow
     overflow-y-scroll overflow-x-hidden p-5 space-y-5
     """,
     children=[

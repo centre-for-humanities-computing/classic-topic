@@ -36,6 +36,6 @@ def document_tooltip(
                     className=" break-normal italic text-gray-700 text-lg",
                 ),
             ],
-            className="flex flex-col p-5",
+            className="flex flex-col p-5 opacity-50",
         )
     ]

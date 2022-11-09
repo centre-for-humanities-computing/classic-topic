@@ -478,11 +478,9 @@ def update_all_documents_plot(
                         y=selected_document.y,
                         z=selected_document.z,
                         text=doc_name,
-                        bgcolor="white",
-                        bordercolor="black",
+                        bgcolor="rgba(255,255,255,0.75)",
                         arrowsize=1,
                         arrowwidth=2,
-                        borderwidth=3,
                         borderpad=10,
                         font=dict(size=16, color="#0369a1"),
                     )
@@ -522,13 +520,8 @@ def download_data(
 )
 def update_genre_weights_popup_children(fit_data: Dict) -> List:
     """Updates the children of the genre weights popup"""
-    if fit_data is None:
-        md = fetch_metadata().dropna(subset="group")
-        genres = md.group.unique().tolist() + ["Rest"]
-    else:
-        documents = pd.DataFrame.from_dict(fit_data["document_data"])
-        genres = documents.group.unique()
-    print("Genres: ", genres)
+    md = fetch_metadata().dropna(subset="group")
+    genres = md.group.unique().tolist() + ["Rest"]
     return [genre_weight_element(genre) for genre in genres]
 
 

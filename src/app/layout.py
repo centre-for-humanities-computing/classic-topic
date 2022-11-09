@@ -40,8 +40,8 @@ layout = html.Div(
                     id="current_topic_plot",
                     className="flex-1 basis-2/3",
                     responsive=True,
-                    animate=True,
-                    animation_options=dict(frame=dict(redraw=True))
+                    # animate=True,
+                    # animation_options=dict(frame=dict(redraw=True))
                 ),
             ],
         ),
@@ -52,10 +52,12 @@ layout = html.Div(
                 document_inspector,
                 dcc.Graph(
                     id="all_documents_plot",
-                    className="flex-none basis-2/3",
+                    className="flex-1 basis-2/3",
                     responsive=True,
+                    animate=True,
+                    animation_options=dict(frame=dict(redraw=True)),
                 ),
-                dcc.Tooltip(id="documents_tooltip"),
+                # dcc.Tooltip(id="documents_tooltip"),
             ],
         ),
         dcc.Loading(

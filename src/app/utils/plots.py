@@ -148,26 +148,6 @@ def documents_plot(document_data: pd.DataFrame) -> go.Figure:
             <i>Click to select</i>
         """
     )
-    annotations = []
-    for _index, row in document_data.iterrows():
-        name = f"{row.værk} - {row.forfatter}"
-        annotations.append(
-            dict(
-                x=row.x,
-                y=row.y,
-                z=row.z,
-                text=name,
-                bgcolor="white",
-                bordercolor="black",
-                arrowsize=1,
-                arrowwidth=2,
-                borderwidth=3,
-                borderpad=10,
-                font=dict(size=16, color="#0369a1"),
-                visible=False,
-                # clicktoshow="onout",
-            )
-        )
     axis = dict(
         showgrid=True,
         zeroline=True,
@@ -182,7 +162,7 @@ def documents_plot(document_data: pd.DataFrame) -> go.Figure:
         plot_bgcolor="rgba(1,1,1,0)",
         hoverlabel=dict(font_size=11),
         scene=dict(
-            xaxis=axis, yaxis=axis, zaxis=axis, annotations=annotations
+            xaxis=axis, yaxis=axis, zaxis=axis
         ),
     )
     return fig
