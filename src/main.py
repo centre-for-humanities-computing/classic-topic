@@ -16,6 +16,7 @@ app = Dash(
             "crossorigin": "anonymous",
         },
     ],
+    url_base_pathname="/classic-topic/"
 )
 
 add_layout(app)
