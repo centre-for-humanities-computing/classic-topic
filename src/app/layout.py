@@ -1,4 +1,3 @@
-# type: ignore
 """Module describing the layout of the app"""
 
 import dash
@@ -40,8 +39,6 @@ layout = html.Div(
                     id="current_topic_plot",
                     className="flex-1 basis-2/3",
                     responsive=True,
-                    # animate=True,
-                    # animation_options=dict(frame=dict(redraw=True))
                 ),
             ],
         ),
@@ -57,7 +54,6 @@ layout = html.Div(
                     animate=True,
                     animation_options=dict(frame=dict(redraw=True)),
                 ),
-                # dcc.Tooltip(id="documents_tooltip"),
             ],
         ),
         dcc.Loading(
@@ -69,7 +65,6 @@ layout = html.Div(
         topic_toolbar,
         sidebar,
         navbar,
-        # save_load,
         genre_weight_popup,
     ],
 )

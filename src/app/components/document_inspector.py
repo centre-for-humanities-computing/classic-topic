@@ -1,10 +1,19 @@
 """Module describing the component for inspecting documents"""
+from typing import Callable, Dict, List, Tuple
 
+from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import dcc, html
+from dash_extensions.enrich import Input, Output, ServersideOutput, State
+import pandas as pd
+import plotly.graph_objects as go
 
-from app.components.settings import setting_group
+from app.components import accordion
+from app.utils.callback import init_callbacks
+from app.utils.plots import document_topic_plot
 
-document_inspector = html.Div(
+callbacks, def_callback = init_callbacks()
+
+layout = html.Div(
     className="""basis-1/3 flex-1 flex-col bg-white shadow
     overflow-y-scroll overflow-x-hidden p-5 space-y-5
     """,
@@ -14,7 +23,7 @@ document_inspector = html.Div(
             options={},
             value=None,
         ),
-        setting_group(
+        accordion.Accordion(
             name="Information",
             index="inspector_info",
             children=[
@@ -35,14 +44,14 @@ document_inspector = html.Div(
                 ),
             ],
         ),
-        setting_group(
+        accordion.Accordion(
             "Topics",
             index="inspector_topics",
             children=[
                 dcc.Graph(id="document_topics_graph", animate=False),
             ],
         ),
-        setting_group(
+        accordion.Accordion(
             "Content",
             index="inspector_content",
             children=[
@@ -57,3 +66,46 @@ document_inspector = html.Div(
         ),
     ],
 )
+document_inspector = layout
+
+
+@def_callback(
+    Output("document_genre", "children"),
+    Output("document_group", "children"),
+    Output("document_topics_graph", "figure"),
+    Output("document_content", "children"),
+    Input("document_selector", "value"),
+    State("fit_store", "data"),
+    State("topic_names", "data"),
+)
+def update_document_inspector(
+    id_nummer: int,
+    fit_data: Dict,
+    topic_names: List[str],
+) -> Tuple[str, str, go.Figure, str]:
+    if id_nummer is None:
+        raise PreventUpdate()
+    id_nummer = int(id_nummer)
+    document_data = (
+        pd.DataFrame(fit_data["document_data"]).set_index("id_nummer").loc[id_nummer]
+    )
+    i_doc = document_data.i_doc
+    importances = pd.DataFrame(fit_data["document_topic_importance"])
+    print(importances)
+    importances = importances[importances.i_doc == i_doc]
+    fig = document_topic_plot(importances, topic_names)
+    genre = f"Genre: {document_data.tlg_genre}"
+    group = f"Group: {document_data.group}"
+    return (genre, group, fig, document_data.text)
+
+
+@def_callback(
+    Output("document_selector", "value"),
+    Input("all_documents_plot", "clickData"),
+)
+def select_document(selected_points: Dict) -> int:
+    if not selected_points:
+        raise PreventUpdate()
+    point, *_ = selected_points["points"]
+    text_id = point["customdata"][-1]
+    return int(text_id)

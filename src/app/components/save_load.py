@@ -1,7 +1,15 @@
-# type: ignore
 """Component for saving and loading fit data."""
+from typing import List, Dict
 
-from dash_extensions.enrich import dcc, html
+from dash.exceptions import PreventUpdate
+from dash_extensions.enrich import html, dcc
+from dash_extensions.enrich import Input, Output, State
+
+from app.utils.callback import init_callbacks
+from app.utils.modelling import serialize_save_data
+
+callbacks, def_callback = init_callbacks()
+
 
 button_class = """
     text-xl transition-all ease-in 
@@ -10,7 +18,7 @@ button_class = """
     flex flex-1
 """
 
-save_load = html.Div(
+layout = html.Div(
     className="""
         fixed flex flex-none flex-row justify-center content-middle
         left-0.5 bottom-10 h-16 w-32 bg-white shadow rounded-full
@@ -38,3 +46,23 @@ save_load = html.Div(
         ),
     ],
 )
+
+save_load = layout
+
+
+@def_callback(
+    Output("download", "data"),
+    Input("download_button", "n_clicks"),
+    State("fit_store", "data"),
+    State("topic_names", "data"),
+    prevent_initial_call=True,
+)
+def download_data(n_clicks: int, fit_data: Dict, topic_names: List[str]) -> Dict:
+    if not n_clicks:
+        raise PreventUpdate()
+    if not fit_data or not topic_names:
+        raise PreventUpdate()
+    return {
+        "content": serialize_save_data(fit_data, topic_names),
+        "filename": "model_data.json",
+    }

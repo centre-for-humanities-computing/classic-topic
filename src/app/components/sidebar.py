@@ -1,7 +1,15 @@
-# type: ignore
-from dash_extensions.enrich import dcc, html
+from typing import Tuple, Dict
 
-from app.components.settings import setting, setting_group
+from dash import ctx
+from dash.exceptions import PreventUpdate
+from dash_extensions.enrich import dcc, html
+from dash_extensions.enrich import Input, Output, State
+
+from app.components import accordion
+from app.components.toolbar import toolbar_class
+from app.utils.callback import init_callbacks
+
+callbacks, def_callback = init_callbacks()
 
 sidebar_body_class = """
     flex fixed w-1/3 flex-col p-3 h-full
@@ -17,10 +25,10 @@ sidebar_shade_class = """
 """
 
 
-feature_extraction = setting_group(
+feature_extraction = accordion.Accordion(
     name="Feature extraction",
     children=[
-        setting(
+        accordion.AccordionItem(
             "Vectorizer: ",
             html.Div(
                 dcc.Dropdown(
@@ -35,7 +43,7 @@ feature_extraction = setting_group(
                 className="flex-1 ml-5",
             ),
         ),
-        setting(
+        accordion.AccordionItem(
             "N-gram range: ",
             dcc.RangeSlider(
                 1,
@@ -47,7 +55,7 @@ feature_extraction = setting_group(
                 className="flex-1 mt-5",
             ),
         ),
-        setting(
+        accordion.AccordionItem(
             "Max doc frequency: ",
             dcc.Slider(
                 id="max_df",
@@ -59,7 +67,7 @@ feature_extraction = setting_group(
                 className="flex-1 mt-5",
             ),
         ),
-        setting(
+        accordion.AccordionItem(
             "Min doc occurrance: ",
             dcc.Slider(
                 id="min_df",
@@ -88,10 +96,10 @@ feature_extraction = setting_group(
     ],
 )
 
-topic_model = setting_group(
+topic_model = accordion.Accordion(
     name="Topic model",
     children=[
-        setting(
+        accordion.AccordionItem(
             "Vectorizer: ",
             html.Div(
                 dcc.Dropdown(
@@ -108,7 +116,7 @@ topic_model = setting_group(
                 className="flex-1 ml-5",
             ),
         ),
-        setting(
+        accordion.AccordionItem(
             "Number of topics: ",
             dcc.Slider(
                 id="n_topics",
@@ -123,7 +131,7 @@ topic_model = setting_group(
     ],
 )
 
-sidebar = html.Div(
+layout = html.Div(
     id="sidebar",
     children=[
         html.Div(
@@ -198,3 +206,61 @@ sidebar = html.Div(
         ),
     ],
 )
+sidebar = layout
+
+
+@def_callback(
+    Output("sidebar_body", "className"),
+    Output("topic_toolbar", "className"),
+    Output("sidebar_shade", "className"),
+    Input("sidebar_collapser", "n_clicks"),
+    Input("current_view", "data"),
+    prevent_initial_call=True,
+)
+def open_close_sidebar(n_clicks: int, current_view: str) -> Tuple[str, str, str]:
+    """Opens or closes sidebar and moves and hides the topic switcher.
+
+    Parameters
+    ----------
+    n_clicks: int
+        Number of times the sidebar collapse button has been clicked
+    current_view: int
+        Data about the current view.
+    """
+    hide_switcher = " translate-y-0" if current_view == "topic" else " translate-y-full"
+    is_open = (n_clicks % 2) == 0
+
+    if is_open:
+        return (
+            sidebar_body_class + " translate-x-full",
+            toolbar_class + hide_switcher,
+            sidebar_shade_class + " bg-opacity-0 hidden",
+        )
+    else:
+        return (
+            sidebar_body_class + " translate-x-0",
+            toolbar_class + hide_switcher,
+            sidebar_shade_class + " bg-opacity-40 block",
+        )
+
+
+@def_callback(
+    Output("sidebar_collapser", "n_clicks"),
+    State("sidebar_collapser", "n_clicks"),
+    Input("fit_store", "data"),
+    Input("fit_pipeline", "n_clicks"),
+    Input("cancel_pipeline", "n_clicks"),
+    prevent_initial_call=True,
+)
+def open_close_sidebar_fitting(
+    current: int, fit_data: Dict, fit_clicks: int, cancel_clicks: int
+) -> int:
+    """Opens or closes sidebar when the fit pipeline button is pressed."""
+    if (
+        ((ctx.triggered_id == "fit_store") and (fit_data is None))
+        or ((ctx.triggered_id == "fit_pipeline") and fit_clicks)
+        or ((ctx.triggered_id == "cancel_pipeline") and cancel_clicks)
+    ):
+        return current + 1
+    else:
+        raise PreventUpdate()

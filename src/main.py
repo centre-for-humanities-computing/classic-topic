@@ -1,8 +1,8 @@
 """Main script creating the app, adding layout and callbacks and running the server"""
 from dash_extensions.enrich import Dash
 
-from app.callbacks import add_callbacks
-from app.layout import add_layout
+from app.app import layout, callbacks
+from app.utils.callback import add_callbacks
 
 app = Dash(
     __name__,
@@ -16,11 +16,13 @@ app = Dash(
             "crossorigin": "anonymous",
         },
     ],
-    url_base_pathname="/classic-topic/"
+    url_base_pathname="/classic-topic/",
 )
 
-add_layout(app)
-add_callbacks(app)
+app.layout = layout
+for callback in callbacks:
+    print(callback["function"])
+add_callbacks(app, callbacks)
 
 server = app.server
 

@@ -1,6 +1,16 @@
+from typing import Dict, List
+
 import dash
 import dash_daq as daq
 from dash import dcc, html
+from dash import ctx
+from dash_extensions.enrich import Input, Output, ServersideOutput, State
+from dash.exceptions import PreventUpdate
+
+from app.utils.callback import init_callbacks
+from app.utils.metadata import fetch_metadata
+
+callbacks, def_callback = init_callbacks()
 
 button_class = """
     text-lg transition-all ease-in 
@@ -99,7 +109,7 @@ def genre_weight_element(genre_name: str) -> html.Div:
     )
 
 
-genre_weight_popup = html.Div(
+layout = html.Div(
     className=popup_container_class + " hidden",
     id="genre_weight_popup_container",
     children=[
@@ -144,3 +154,73 @@ genre_weight_popup = html.Div(
         )
     ],
 )
+genre_weight_popup = layout
+
+
+@def_callback(
+    Output("genre_weight_popup", "children"),
+    Input("fit_store", "data"),
+    prevent_initial_call=True,
+)
+def update_popup_children(fit_data: Dict) -> List:
+    """Updates the children of the genre weights popup"""
+    print("Updating popup children")
+    md = fetch_metadata().dropna(subset="group")
+    genres = md.group.unique().tolist() + ["Rest"]
+    return [genre_weight_element(genre) for genre in genres]
+
+
+@def_callback(
+    Output("genre_weights", "data"),
+    Input(dict(type="genre_switch", index=dash.ALL), "on"),
+    State(dict(type="genre_switch", index=dash.ALL), "id"),
+    Input(dict(type="genre_weight_slider", index=dash.ALL), "value"),
+    State(dict(type="genre_weight_slider", index=dash.ALL), "id"),
+    prevent_initial_call=True,
+)
+def update_genre_weights(
+    is_on: List[bool],
+    switch_ids: List[Dict[str, str]],
+    weights: List[int],
+    weight_ids: List[Dict[str, str]],
+):
+    """Updates genre weights based on the values set in the popup."""
+    if not is_on or not switch_ids or not weights or not weight_ids:
+        raise PreventUpdate()
+    is_on_mapping = {id["index"]: on for id, on in zip(switch_ids, is_on)}
+    weight_mapping = {id["index"]: weight for id, weight in zip(weight_ids, weights)}
+    genres = is_on_mapping.keys()
+    genre_weights = {
+        genre: weight_mapping[genre] if is_on_mapping[genre] else 0 for genre in genres
+    }
+    return genre_weights
+
+
+@def_callback(
+    Output("genre_weight_popup_container", "className"),
+    Input("weight_settings", "n_clicks"),
+    Input("close_weight_popup", "n_clicks"),
+    prevent_initial_call=True,
+)
+def open_close_popup(open_clicks: int, close_clicks: int) -> str:
+    """Opens and closes genre weights popup when needed"""
+    if not open_clicks and not close_clicks:
+        raise PreventUpdate()
+    if "weight_settings" == ctx.triggered_id:
+        return popup_container_class + " fixed"
+    if "close_weight_popup" == ctx.triggered_id:
+        return popup_container_class + " hidden"
+    raise PreventUpdate()
+
+
+@def_callback(
+    Output(dict(type="genre_settings_container", index=dash.MATCH), "className"),
+    Input(dict(type="genre_switch", index=dash.MATCH), "on"),
+    prevent_initial_call=True,
+)
+def hide_genre_settings(is_genre_on: bool) -> str:
+    """Hides settings for a genre if it is filtered away in the popup"""
+    if is_genre_on:
+        return setting_container_class
+    else:
+        return setting_container_class + " hidden"
