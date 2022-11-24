@@ -20,9 +20,9 @@ button_class = """
 
 layout = html.Div(
     className="""
-        fixed flex flex-none flex-row justify-center content-middle
-        left-0.5 bottom-10 h-16 w-32 bg-white shadow rounded-full
-        rounded-full ml-5
+        flex flex-none flex-row justify-center content-middle
+        h-16 w-32 bg-white shadow rounded-full
+        rounded-full
     """,
     children=[
         html.Button(
@@ -46,8 +46,6 @@ layout = html.Div(
         ),
     ],
 )
-
-save_load = layout
 
 
 @def_callback(

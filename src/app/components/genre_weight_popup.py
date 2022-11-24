@@ -1,3 +1,4 @@
+"""Genre weight popup container component"""
 from typing import Dict, List
 
 import dash
@@ -12,14 +13,6 @@ from app.utils.metadata import fetch_metadata
 
 callbacks, def_callback = init_callbacks()
 
-button_class = """
-    text-lg transition-all ease-in 
-    justify-center content-center items-center
-    text-sky-700 hover:text-sky-800
-    bg-gray-300 bg-opacity-0
-    hover:bg-opacity-10
-    flex px-3 py-1.5 rounded-xl mx-2 my-3
-"""
 popup_container_class = """
     w-full h-full bg-black bg-opacity-10 z-50
 """
@@ -109,6 +102,37 @@ def genre_weight_element(genre_name: str) -> html.Div:
     )
 
 
+select_deselect = html.Div(
+    className="""
+        text-lg transition-all ease-in
+        justify-center content-center items-center
+        flex text-white mx-2 my-5
+    """,
+    children=[
+        html.Button(
+            "Select All",
+            className="""transition-all ease-in
+                text-green-700 hover:text-green-800
+                rounded-l-xl bg-green-200
+                bg-opacity-10 hover:bg-opacity-20
+                pl-3 py-1.5 pr-3
+            """,
+            id="genre_weights_select_all",
+        ),
+        html.Button(
+            "Deselect All",
+            className="""transition-all ease-in
+                text-red-700 hover:text-red-800
+                rounded-r-xl bg-red-200
+                bg-opacity-10 hover:bg-opacity-20
+                pr-3 py-1.5 pl-3
+            """,
+            id="genre_weights_deselect_all",
+        ),
+    ],
+)
+
+
 layout = html.Div(
     className=popup_container_class + " hidden",
     id="genre_weight_popup_container",
@@ -128,16 +152,25 @@ layout = html.Div(
                         items-center shadow z-10
                     """,
                     children=[
-                        html.H2(
-                            "Genre settings",
-                            className="text-lg ml-5 flex-1",
-                        ),
+                        select_deselect,
                         html.Div(className="flex-1"),
+                        # html.H2(
+                        #     "Genre settings",
+                        #     className="text-lg ml-5 flex-1",
+                        # ),
+                        # html.Div(className="flex-1"),
                         html.Button(
                             "Done",
                             id="close_weight_popup",
                             title="Close popup",
-                            className=button_class,
+                            className="""
+                                text-lg transition-all ease-in
+                                justify-center content-center items-center
+                                text-sky-700 hover:text-sky-800
+                                bg-gray-300 bg-opacity-0
+                                hover:bg-opacity-10
+                                flex px-3 py-1.5 rounded-xl mx-2
+                            """,
                         ),
                     ],
                 ),
@@ -154,7 +187,6 @@ layout = html.Div(
         )
     ],
 )
-genre_weight_popup = layout
 
 
 @def_callback(
@@ -164,10 +196,39 @@ genre_weight_popup = layout
 )
 def update_popup_children(fit_data: Dict) -> List:
     """Updates the children of the genre weights popup"""
-    print("Updating popup children")
+    # Fetch metadata where group is present
     md = fetch_metadata().dropna(subset="group")
+    # Extract all unique groups + Rest
     genres = md.group.unique().tolist() + ["Rest"]
+    # Create an element for each genre
     return [genre_weight_element(genre) for genre in genres]
+
+
+@def_callback(
+    Output(dict(type="genre_switch", index=dash.ALL), "on"),
+    State(dict(type="genre_switch", index=dash.ALL), "id"),
+    Input("genre_weights_deselect_all", "n_clicks"),
+    Input("genre_weights_select_all", "n_clicks"),
+)
+def toggle_all(
+    switch_ids: List[Dict[str, str]], n_deselect: int, n_select: int
+) -> List[bool]:
+    """Selects or deselects all genres."""
+    # If none of the buttons have been clicked so far or there are no genres
+    # loaded, prevent from updating
+    if (not n_deselect and not n_select) or not switch_ids:
+        raise PreventUpdate
+    # Getting number of genres
+    n_genres = len(switch_ids)
+    if ctx.triggered_id == "genre_weights_deselect_all":
+        # Return all falses if deselect triggered the callback
+        return [False] * n_genres
+    if ctx.triggered_id == "genre_weights_select_all":
+        # Return all trues if select triggered the callback
+        return [True] * n_genres
+    # Since we have been exhaustive, this should never happen
+    # I'm just pleasing static analysis tools
+    raise PreventUpdate
 
 
 @def_callback(
@@ -179,20 +240,28 @@ def update_popup_children(fit_data: Dict) -> List:
     prevent_initial_call=True,
 )
 def update_genre_weights(
-    is_on: List[bool],
+    is_on_values: List[bool],
     switch_ids: List[Dict[str, str]],
-    weights: List[int],
+    weight_values: List[int],
     weight_ids: List[Dict[str, str]],
 ):
     """Updates genre weights based on the values set in the popup."""
-    if not is_on or not switch_ids or not weights or not weight_ids:
+    # If the callback is frivolous, don't update anything
+    if not is_on_values or not switch_ids or not weight_values or not weight_ids:
         raise PreventUpdate()
-    is_on_mapping = {id["index"]: on for id, on in zip(switch_ids, is_on)}
-    weight_mapping = {id["index"]: weight for id, weight in zip(weight_ids, weights)}
-    genres = is_on_mapping.keys()
-    genre_weights = {
-        genre: weight_mapping[genre] if is_on_mapping[genre] else 0 for genre in genres
-    }
+    # Mapping genre indices to their status
+    is_on = {id["index"]: on for id, on in zip(switch_ids, is_on_values)}
+    # Mapping genre indices to their weights
+    weights = {id["index"]: weight for id, weight in zip(weight_ids, weight_values)}
+    genres = is_on.keys()
+    # For each genre if the genre is ON, map its name to its assigned weight
+    # if it isn't, assign a weight of 0
+    genre_weights = dict()
+    for genre in genres:
+        if is_on[genre]:
+            genre_weights[genre] = weights[genre]
+        else:
+            genre_weights[genre] = 0
     return genre_weights
 
 

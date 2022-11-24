@@ -8,15 +8,14 @@ from app.utils.callback import init_callbacks
 
 callbacks, def_callback = init_callbacks()
 
-topic_switcher_class = """
-    flex h-16 flex-row bg-white bg-opacity-100 shadow z-10 rounded-full
-    justify-between px-6
-    basis-1/2 shrink
-"""
-
 layout = html.Div(
     id="topic_switcher",
-    className=topic_switcher_class,
+    className="""
+        relative
+        flex h-16 flex-row bg-white bg-opacity-100 shadow z-10 rounded-full
+        justify-between
+        basis-1/2 shrink
+    """,
     children=[
         html.Button(
             "<- Previous topic",

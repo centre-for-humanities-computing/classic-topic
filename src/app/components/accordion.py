@@ -1,3 +1,4 @@
+"""Module containing a generic accordion component"""
 from typing import Optional, Tuple
 
 import dash
@@ -8,15 +9,37 @@ from app.utils.callback import init_callbacks
 
 callbacks, def_callback = init_callbacks()
 
+# Styles for the accordion body
 visible = "flex-1 flex-col flex items-stretch justify-evenly"
-hidden = "hidden"
 
 
+# NOTE: consider using Dash Mantine. It's way to much effort to maintain this
+# and adds a lot of unnecessary complexity.
 def Accordion(
     name: str,
     children,
     index: Optional[str] = None,
+    # NOTE: This is 100% implementation detail, Mantine would also
+    # elliminate this.
 ) -> html.Div:
+    """
+    Dash Accordion component.
+
+    Parameters
+    ----------
+    name: str
+        Name that will be displayed on the top of the accordion.
+    children: list of dash component
+        List of children of the accordion.
+    index: str or None, default None
+        Index to be used in the callbacks.
+        If not specified, name will be used as index.
+
+    Note
+    ----
+    In order for the component to work properly, you should add the
+    accordion's callbacks to the global callback list.
+    """
     if index is None:
         index = name
     return html.Div(
@@ -87,9 +110,16 @@ def AccordionItem(name: str, *children):
     Input(dict(type="_setting_group_collapse", index=dash.MATCH), "n_clicks"),
     prevent_initial_call=True,
 )
-def expand_hide_setting_group(n_clicks: int) -> Tuple[str, str]:
+def toggle_accordion(n_clicks: int) -> Tuple[str, str]:
+    """Toggles accordion"""
+    # If the number of times the expander has been clicked is not divisible
+    # by two, we know the accordion body is visible
     is_on = not (n_clicks % 2)
     if is_on:
+        # Turning the accordion body visible
+        # Rotating the collapser
         return visible, "transition-all ease-in rotate-0"
     else:
+        # Hiding accordion body
+        # Rotating the collapser
         return "hidden", "transition-all ease-in rotate-180"

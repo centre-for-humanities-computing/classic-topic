@@ -1,4 +1,5 @@
-"""Module describing the topic switcher component of the application."""
+"""Module describing the bottom toolbar for the topic view with all of
+its subcomponents"""
 from dash_extensions.enrich import dcc, html
 
 from app.components import topic_switcher, save_load
@@ -8,6 +9,7 @@ callbacks, def_callback = init_callbacks()
 callbacks.extend(topic_switcher.callbacks)
 callbacks.extend(save_load.callbacks)
 
+# Lambda slider component layout
 relevance_slider = html.Div(
     className="""
         flex justify-between items-center
@@ -28,15 +30,17 @@ relevance_slider = html.Div(
     ],
 )
 
+# Tailwind class for the toolbar object
 toolbar_class = """
     flex transition-all ease-in delay-75
-    fixed flex-row bottom-0 left-0 p-10
-    w-full justify-between space-x-10
+    fixed flex-row bottom-0 left-0 p-5
+    w-full justify-between space-x-10 justify-items-center
 """
 
 layout = html.Div(
     id="topic_toolbar",
     className=toolbar_class,
+    # The layout will contain the save/load,
+    # topic switcher and slider components
     children=[save_load.layout, topic_switcher.layout, relevance_slider],
 )
-topic_toolbar = layout

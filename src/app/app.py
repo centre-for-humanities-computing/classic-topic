@@ -9,12 +9,7 @@ from dash_extensions.enrich import Input, Output, ServersideOutput, State
 from dash_extensions.enrich import dcc, html
 import pandas as pd
 
-from app.components import (
-    genre_weight_popup,
-    navbar,
-    sidebar,
-    toolbar,
-)
+from app.components import genre_weight_popup, navbar, sidebar, toolbar, accordion
 from app.views import topic_view, document_view
 from app.utils.modelling import (
     calculate_genre_importance,
@@ -36,6 +31,7 @@ callbacks.extend(toolbar.callbacks)
 callbacks.extend(sidebar.callbacks)
 callbacks.extend(navbar.callbacks)
 callbacks.extend(genre_weight_popup.callbacks)
+callbacks.extend(accordion.callbacks)
 
 
 layout = html.Div(

@@ -41,7 +41,6 @@ layout = html.Div(
         ),
     ],
 )
-navbar = layout
 
 
 @def_callback(

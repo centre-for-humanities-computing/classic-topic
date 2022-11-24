@@ -1,5 +1,5 @@
 """Module describing the component for inspecting documents"""
-from typing import Callable, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import dcc, html
@@ -66,7 +66,6 @@ layout = html.Div(
         ),
     ],
 )
-document_inspector = layout
 
 
 @def_callback(
@@ -83,16 +82,23 @@ def update_document_inspector(
     fit_data: Dict,
     topic_names: List[str],
 ) -> Tuple[str, str, go.Figure, str]:
+    """Updates plots and data in the document inspector when a document is
+    selected"""
     if id_nummer is None:
+        # Prevent updating if no document is selected
         raise PreventUpdate()
+    # Making sure the ID is a number
     id_nummer = int(id_nummer)
+    # Finding data for the selected document in the DataFrame
     document_data = (
         pd.DataFrame(fit_data["document_data"]).set_index("id_nummer").loc[id_nummer]
     )
+    # Extracting index of the document
     i_doc = document_data.i_doc
+    # Getting topic importances for the document
     importances = pd.DataFrame(fit_data["document_topic_importance"])
-    print(importances)
     importances = importances[importances.i_doc == i_doc]
+    # Producing plot
     fig = document_topic_plot(importances, topic_names)
     genre = f"Genre: {document_data.tlg_genre}"
     group = f"Group: {document_data.group}"
@@ -104,6 +110,7 @@ def update_document_inspector(
     Input("all_documents_plot", "clickData"),
 )
 def select_document(selected_points: Dict) -> int:
+    """Selects document when it is clicked on in the scatter plot"""
     if not selected_points:
         raise PreventUpdate()
     point, *_ = selected_points["points"]

@@ -218,15 +218,7 @@ sidebar = layout
     prevent_initial_call=True,
 )
 def open_close_sidebar(n_clicks: int, current_view: str) -> Tuple[str, str, str]:
-    """Opens or closes sidebar and moves and hides the topic switcher.
-
-    Parameters
-    ----------
-    n_clicks: int
-        Number of times the sidebar collapse button has been clicked
-    current_view: int
-        Data about the current view.
-    """
+    """Opens or closes sidebar and moves and hides the topic switcher."""
     hide_switcher = " translate-y-0" if current_view == "topic" else " translate-y-full"
     is_open = (n_clicks % 2) == 0
 
@@ -256,6 +248,8 @@ def open_close_sidebar_fitting(
     current: int, fit_data: Dict, fit_clicks: int, cancel_clicks: int
 ) -> int:
     """Opens or closes sidebar when the fit pipeline button is pressed."""
+    # TODO: Explain what this does, this is not understandable without
+    # documentation
     if (
         ((ctx.triggered_id == "fit_store") and (fit_data is None))
         or ((ctx.triggered_id == "fit_pipeline") and fit_clicks)
