@@ -133,12 +133,12 @@ def documents_plot(document_data: pd.DataFrame) -> go.Figure:
         z="z",
         color="topic_name",
         custom_data=[
-            "værk",
-            "forfatter",
+            "work",
+            "author",
             "group",
             "tlg_genre",
             "topic_name",
-            "id_nummer",
+            "document_id",
         ],
     )
     # fig.update_traces(hovertemplate=None, hoverinfo="none")
@@ -161,9 +161,7 @@ def documents_plot(document_data: pd.DataFrame) -> go.Figure:
         paper_bgcolor="rgba(1,1,1,0)",
         plot_bgcolor="rgba(1,1,1,0)",
         hoverlabel=dict(font_size=11),
-        scene=dict(
-            xaxis=axis, yaxis=axis, zaxis=axis
-        ),
+        scene=dict(xaxis=axis, yaxis=axis, zaxis=axis),
     )
     return fig
 

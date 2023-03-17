@@ -56,13 +56,15 @@ def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
 MAX_FEATURES = 100_000
 
 
-def prepare_corpus(corpus: pd.DataFrame, genre_weights: Dict[str, int]) -> pd.DataFrame:
+def prepare_corpus(
+    corpus: pd.DataFrame, genre_weights: Dict[str, int]
+) -> pd.DataFrame:
     """Prepares corpus for training with the given genre weights"""
     md = fetch_metadata()
     md = md[~md.skal_fjernes]
-    md = md[["id_nummer", "værk", "forfatter", "group", "tlg_genre"]]
+    md = md[["document_id", "work", "author", "group", "tlg_genre"]]
     md["group"] = md.group.fillna("Rest")
-    corpus = corpus.merge(md, on="id_nummer", how="inner")
+    corpus = corpus.merge(md, on="document_id", how="inner")
     corpus = corpus.assign(weight=corpus.group.map(genre_weights))
     # Weighting the different groups
     corpus = repeat_rows(corpus, weight_col="weight")
@@ -146,32 +148,22 @@ def calculate_genre_importance(
     DataFrame
         Data about topic importances for each group.
     """
-    # Removing unnecessary groups
-    # NOTE: This will be removed in the future
-    important_works = corpus[
-        ~corpus.group.isin(
-            [
-                "Jewish Philosophy",
-                "Jewish Pseudepigrapha",
-                "NT Epistolography",
-                "LXX Poetry/Wisdom",
-            ]
-        )
-    ]
     # Obtaining probabilities of each important working
     # belonging to a certain topic.
-    probs = pipeline.transform(important_works.text)
-    important_works = important_works.assign(
+    probs = pipeline.transform(corpus.text)
+    corpus = corpus.assign(
         # Assigning a topic embedding to each work
         topic=list(map(np.array, probs.tolist()))  # type: ignore
     )
     # Computing aggregated topic importances for each group
-    importance = important_works.groupby("group").agg(
+    importance = corpus.groupby("group").agg(
         topic=("topic", lambda s: np.stack(s).sum(axis=0))
     )
     # Normalizing these quantities, so that group sizes do
     # not mess with the analysis
-    importance = importance.assign(topic=importance.topic.map(lambda a: a / a.max()))
+    importance = importance.assign(
+        topic=importance.topic.map(lambda a: a / a.max())
+    )
     # Adding topic labels to the embeddings by enumerating them
     # and then exploding them
     importance = importance.applymap(
@@ -294,7 +286,9 @@ def prepare_topic_data(
     term_frequency = np.squeeze(np.asarray(term_frequency))
     # Determining topic positions with TSNE
     topic_pos = (
-        TSNE(perplexity=5, init="pca", learning_rate="auto").fit_transform(components).T
+        TSNE(perplexity=5, init="pca", learning_rate="auto")
+        .fit_transform(components)
+        .T
     )
     topic_id = np.arange(n_topics)
     return {
@@ -330,7 +324,8 @@ def prepare_document_data(
         topic_id=dominant_topic,
     )
     importance_sparse = topic_document_importance(
-        document_topic_matrix, document_id=documents.id_nummer
+        document_topic_matrix,
+        document_id=documents.document_id,  # type: ignore
     )
     return {
         "document_data": documents.to_dict(),

@@ -4,8 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import ctx
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import Input, Output, ServersideOutput, State
-from dash_extensions.enrich import dcc, html
+from dash_extensions.enrich import Input, Output, State, dcc, html
 
 from app.components import document_inspector
 from app.utils.callback import init_callbacks
@@ -55,16 +54,18 @@ def update_all_documents_plot(
     # since Series also function as a mapping, you can use them in the .map()
     # method
     names = pd.Series(topic_names)
-    document_data = document_data.assign(topic_name=document_data.topic_id.map(names))
+    document_data = document_data.assign(
+        topic_name=document_data.topic_id.map(names)
+    )
     if ctx.triggered_id in ("fit_store", "topic_names"):
         return documents_plot(document_data)
     if ctx.triggered_id == "document_selector":
         if selected_id is None:
             raise PreventUpdate()
         selected_id = int(selected_id)
-        selected_document = document_data[document_data.id_nummer == selected_id].iloc[
-            0
-        ]
+        selected_document = document_data[
+            document_data.document_id == selected_id
+        ].iloc[0]
         doc_name = f"{selected_document.værk} - {selected_document.forfatter}"
         layout = {
             **current_fig["layout"],

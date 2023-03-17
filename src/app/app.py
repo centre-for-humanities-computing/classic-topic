@@ -6,9 +6,22 @@ from typing import Dict, List, Tuple
 import pandas as pd
 from dash import ctx
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import Input, Output, ServersideOutput, State, dcc, html
+from dash_extensions.enrich import (
+    Input,
+    Output,
+    ServersideOutput,
+    State,
+    dcc,
+    html,
+)
 
-from app.components import accordion, genre_weight_popup, navbar, sidebar, toolbar
+from app.components import (
+    accordion,
+    genre_weight_popup,
+    navbar,
+    sidebar,
+    toolbar,
+)
 from app.utils.callback import init_callbacks
 from app.utils.modelling import (
     calculate_genre_importance,
@@ -119,7 +132,9 @@ def update_fit(
     )
     # Inferring data from the fit
     genre_importance = calculate_genre_importance(corpus_, pipeline)
-    pipeline_data = prepare_pipeline_data(pipeline.vectorizer, pipeline.topic_model)
+    pipeline_data = prepare_pipeline_data(
+        pipeline.vectorizer, pipeline.topic_model
+    )
     transformed_data = prepare_transformed_data(
         pipeline.vectorizer, pipeline.topic_model, texts=corpus_.text
     )
@@ -199,7 +214,7 @@ def update_document_selector_options(fit_data: Dict) -> Dict[int, str]:
     if fit_data is None:
         raise PreventUpdate
     documents = pd.DataFrame.from_dict(fit_data["document_data"])
-    documents = documents.merge(corpus, on="id_nummer", how="inner")
+    documents = documents.merge(corpus, on="document_id", how="inner")
     return {
         int(id_nummer): f"{work} - {author}"
         for id_nummer, work, author in zip(

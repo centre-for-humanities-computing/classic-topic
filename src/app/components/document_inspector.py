@@ -1,11 +1,17 @@
 """Module describing the component for inspecting documents"""
 from typing import Dict, List, Tuple
 
-from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import dcc, html
-from dash_extensions.enrich import Input, Output, ServersideOutput, State
 import pandas as pd
 import plotly.graph_objects as go
+from dash.exceptions import PreventUpdate
+from dash_extensions.enrich import (
+    Input,
+    Output,
+    ServersideOutput,
+    State,
+    dcc,
+    html,
+)
 
 from app.components import accordion
 from app.utils.callback import init_callbacks
@@ -78,20 +84,20 @@ layout = html.Div(
     State("topic_names", "data"),
 )
 def update_document_inspector(
-    id_nummer: int,
+    document_id: str,
     fit_data: Dict,
     topic_names: List[str],
 ) -> Tuple[str, str, go.Figure, str]:
     """Updates plots and data in the document inspector when a document is
     selected"""
-    if id_nummer is None:
+    if document_id is None:
         # Prevent updating if no document is selected
         raise PreventUpdate()
-    # Making sure the ID is a number
-    id_nummer = int(id_nummer)
     # Finding data for the selected document in the DataFrame
     document_data = (
-        pd.DataFrame(fit_data["document_data"]).set_index("id_nummer").loc[id_nummer]
+        pd.DataFrame(fit_data["document_data"])
+        .set_index("document_id")
+        .loc[document_id]
     )
     # Extracting index of the document
     i_doc = document_data.i_doc
