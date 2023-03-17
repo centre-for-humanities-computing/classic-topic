@@ -26,7 +26,6 @@ from app.utils.callback import init_callbacks
 from app.utils.modelling import (
     calculate_genre_importance,
     fit_pipeline,
-    load_corpus,
     prepare_corpus,
     prepare_document_data,
     prepare_pipeline_data,
@@ -216,8 +215,8 @@ def update_document_selector_options(fit_data: Dict) -> Dict[int, str]:
     documents = pd.DataFrame.from_dict(fit_data["document_data"])
     documents = documents.merge(corpus, on="document_id", how="inner")
     return {
-        int(id_nummer): f"{work} - {author}"
-        for id_nummer, work, author in zip(
-            documents.id_nummer, documents.værk, documents.forfatter
+        document_id: f"{work} - {author}"
+        for document_id, work, author in zip(
+            documents.document_id, documents.work, documents.author
         )
     }
