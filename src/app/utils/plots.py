@@ -67,9 +67,11 @@ def all_topics_plot(topic_data: pd.DataFrame, current_topic: int) -> go.Figure:
     Figure
         Bubble plot of topics.
     """
-    topic_data = topic_data.assign(
+    topic_data: pd.DataFrame = topic_data.assign(
         selected=(topic_data.topic_id == current_topic).astype(int)
     )
+    topic_data["size"] = topic_data["size"] / topic_data["size"].max()
+    print(topic_data)
     fig = px.scatter(
         topic_data,
         x="x",
@@ -126,6 +128,7 @@ def documents_plot(document_data: pd.DataFrame) -> go.Figure:
     Figure
         3D Scatter plot of all documents.
     """
+    print(document_data)
     fig = px.scatter_3d(
         document_data,
         x="x",

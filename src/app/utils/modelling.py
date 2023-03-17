@@ -68,6 +68,8 @@ def prepare_corpus(
     corpus = corpus.assign(weight=corpus.group.map(genre_weights))
     # Weighting the different groups
     corpus = repeat_rows(corpus, weight_col="weight")
+    # Remove NAs
+    corpus = corpus.dropna(subset="text")
     return corpus
 
 
@@ -310,7 +312,7 @@ def prepare_document_data(
     # Setting up dimensionality reduction pipeline
     dim_red_pipeline = Pipeline(
         [
-            ("SVD", TruncatedSVD(50)),
+            ("SVD", TruncatedSVD(10)),
             ("t-SNE", TSNE(3, init="random", learning_rate="auto")),
         ]
     )

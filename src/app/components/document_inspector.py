@@ -121,4 +121,4 @@ def select_document(selected_points: Dict) -> int:
         raise PreventUpdate()
     point, *_ = selected_points["points"]
     text_id = point["customdata"][-1]
-    return int(text_id)
+    return text_id

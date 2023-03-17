@@ -11,4 +11,5 @@ def fetch_metadata(sheet_url: str = DEFAULT_SHEET_URL) -> pd.DataFrame:
     """
     sheet_url = sheet_url.replace("/edit#gid=", "/export?format=csv&gid=")
     metadata = pd.read_csv(sheet_url)
+    metadata.skal_fjernes = metadata.skal_fjernes == "True"
     return metadata

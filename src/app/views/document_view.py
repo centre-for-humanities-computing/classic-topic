@@ -62,11 +62,10 @@ def update_all_documents_plot(
     if ctx.triggered_id == "document_selector":
         if selected_id is None:
             raise PreventUpdate()
-        selected_id = int(selected_id)
         selected_document = document_data[
             document_data.document_id == selected_id
         ].iloc[0]
-        doc_name = f"{selected_document.værk} - {selected_document.forfatter}"
+        doc_name = f"{selected_document.work} - {selected_document.author}"
         layout = {
             **current_fig["layout"],
             "uirevision": True,
