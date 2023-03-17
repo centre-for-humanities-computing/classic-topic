@@ -31,11 +31,6 @@ VECTORIZERS = {
 }
 
 
-def load_corpus() -> pd.DataFrame:
-    """Loads the corpus from disk."""
-    return pd.read_csv("../dat/cleaned_corpus.csv")
-
-
 def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
     """Repeats rows by their individual weights in a specific weight column.
 
@@ -61,9 +56,7 @@ def repeat_rows(df: pd.DataFrame, weight_col: str = "weight") -> pd.DataFrame:
 MAX_FEATURES = 100_000
 
 
-def prepare_corpus(
-    corpus: pd.DataFrame, genre_weights: Dict[str, int]
-) -> pd.DataFrame:
+def prepare_corpus(corpus: pd.DataFrame, genre_weights: Dict[str, int]) -> pd.DataFrame:
     """Prepares corpus for training with the given genre weights"""
     md = fetch_metadata()
     md = md[~md.skal_fjernes]
@@ -178,9 +171,7 @@ def calculate_genre_importance(
     )
     # Normalizing these quantities, so that group sizes do
     # not mess with the analysis
-    importance = importance.assign(
-        topic=importance.topic.map(lambda a: a / a.max())
-    )
+    importance = importance.assign(topic=importance.topic.map(lambda a: a / a.max()))
     # Adding topic labels to the embeddings by enumerating them
     # and then exploding them
     importance = importance.applymap(
@@ -303,9 +294,7 @@ def prepare_topic_data(
     term_frequency = np.squeeze(np.asarray(term_frequency))
     # Determining topic positions with TSNE
     topic_pos = (
-        TSNE(perplexity=5, init="pca", learning_rate="auto")
-        .fit_transform(components)
-        .T
+        TSNE(perplexity=5, init="pca", learning_rate="auto").fit_transform(components).T
     )
     topic_id = np.arange(n_topics)
     return {

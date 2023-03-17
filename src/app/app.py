@@ -3,27 +3,28 @@ import base64
 import json
 from typing import Dict, List, Tuple
 
+import pandas as pd
 from dash import ctx
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import Input, Output, ServersideOutput, State
-from dash_extensions.enrich import dcc, html
-import pandas as pd
+from dash_extensions.enrich import Input, Output, ServersideOutput, State, dcc, html
 
-from app.components import genre_weight_popup, navbar, sidebar, toolbar, accordion
-from app.views import topic_view, document_view
+from app.components import accordion, genre_weight_popup, navbar, sidebar, toolbar
+from app.utils.callback import init_callbacks
 from app.utils.modelling import (
     calculate_genre_importance,
     fit_pipeline,
+    load_corpus,
     prepare_corpus,
     prepare_document_data,
     prepare_pipeline_data,
     prepare_topic_data,
     prepare_transformed_data,
-    load_corpus,
 )
-from app.utils.callback import init_callbacks
+from app.views import document_view, topic_view
 
-corpus = load_corpus()
+# Loading corpus from disk
+corpus = pd.read_csv("../dat/cleaned_corpus.csv")
+
 callbacks, def_callback = init_callbacks()
 callbacks.extend(topic_view.callbacks)
 callbacks.extend(document_view.callbacks)
