@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
+import plotly.express as px
 import scipy.sparse as spr
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -308,21 +309,35 @@ def prepare_document_data(
     document_topic_matrix: np.ndarray,
     **kwargs,
 ) -> Dict:
+    n_docs = len(corpus.index)
     dominant_topic = np.argmax(document_topic_matrix, axis=1)
     # Setting up dimensionality reduction pipeline
+    perplexity = min(n_docs - 1, 20)
     dim_red_pipeline = Pipeline(
         [
             ("SVD", TruncatedSVD(10)),
-            ("t-SNE", TSNE(3, init="random", learning_rate="auto")),
+            (
+                "t-SNE",
+                TSNE(
+                    3,
+                    init="random",
+                    learning_rate="auto",
+                    perplexity=perplexity,
+                ),
+            ),
         ]
     )
-    # Calculating positions in 3D space
-    x, y, z = dim_red_pipeline.fit_transform(document_term_matrix).T
+    # If there's only one document we don't try to calculate positions
+    if n_docs > 1:
+        # Calculating positions in 3D space
+        x, y, z = dim_red_pipeline.fit_transform(document_term_matrix).T
+    else:
+        x, y, z = 0, 0, 0
     documents = corpus.assign(
         x=x,
         y=y,
         z=z,
-        i_doc=np.arange(len(corpus.index)),
+        i_doc=np.arange(n_docs),
         topic_id=dominant_topic,
     )
     importance_sparse = topic_document_importance(

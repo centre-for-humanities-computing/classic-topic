@@ -6,32 +6,16 @@ from typing import Dict, List, Tuple
 import pandas as pd
 from dash import ctx
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import (
-    Input,
-    Output,
-    ServersideOutput,
-    State,
-    dcc,
-    html,
-)
+from dash_extensions.enrich import (Input, Output, ServersideOutput, State,
+                                    dcc, html)
 
-from app.components import (
-    accordion,
-    genre_weight_popup,
-    navbar,
-    sidebar,
-    toolbar,
-)
+from app.components import (accordion, genre_weight_popup, navbar, sidebar,
+                            toolbar)
 from app.utils.callback import init_callbacks
-from app.utils.modelling import (
-    calculate_genre_importance,
-    fit_pipeline,
-    prepare_corpus,
-    prepare_document_data,
-    prepare_pipeline_data,
-    prepare_topic_data,
-    prepare_transformed_data,
-)
+from app.utils.modelling import (calculate_genre_importance, fit_pipeline,
+                                 prepare_corpus, prepare_document_data,
+                                 prepare_pipeline_data, prepare_topic_data,
+                                 prepare_transformed_data)
 from app.views import document_view, topic_view
 
 # Loading corpus from disk

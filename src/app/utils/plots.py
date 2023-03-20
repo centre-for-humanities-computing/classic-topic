@@ -1,6 +1,7 @@
 """Module containing plotting utilities."""
 from typing import Dict, List
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -67,8 +68,9 @@ def all_topics_plot(topic_data: pd.DataFrame, current_topic: int) -> go.Figure:
     Figure
         Bubble plot of topics.
     """
-    topic_data: pd.DataFrame = topic_data.assign(
-        selected=(topic_data.topic_id == current_topic).astype(int)
+    topic_data = topic_data.copy()
+    topic_data["selected"] = np.where(
+        topic_data["topic_id"] == current_topic, 1, 0
     )
     topic_data["size"] = topic_data["size"] / topic_data["size"].max()
     print(topic_data)
@@ -197,7 +199,6 @@ def document_topic_plot(
         names="topic_name",
         color_discrete_sequence=px.colors.sequential.RdBu,
     )
-    print(importances)
     fig.update_traces(textposition="inside", textinfo="label")
     fig.update_layout(
         showlegend=False,
