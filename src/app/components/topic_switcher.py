@@ -1,8 +1,7 @@
 from typing import List
 
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import dcc, html
-from dash_extensions.enrich import Input, Output, State
+from dash_extensions.enrich import Input, Output, State, dcc, html
 
 from app.utils.callback import init_callbacks
 
@@ -18,10 +17,10 @@ layout = html.Div(
     """,
     children=[
         html.Button(
-            "<- Previous topic",
+            "<-",
             id="prev_topic",
             n_clicks=0,
-            className="flex-1 mr-3 text-sky-700 hover:text-sky-800",
+            className="flex-1 mr-3 text-sky-700 hover:text-sky-800 min-w-fit p-5",
         ),
         html.P(
             "Rename current topic: ",
@@ -41,10 +40,10 @@ layout = html.Div(
             """,
         ),
         html.Button(
-            "Next topic ->",
+            "->",
             id="next_topic",
             n_clicks=0,
-            className="flex-1 text-sky-700 hover:text-sky-800",
+            className="flex-1 text-sky-700 hover:text-sky-800 min-w-fit p-5",
         ),
     ],
 )
@@ -68,6 +67,10 @@ def update_topic_switcher(topic_names: List[str], current_topic: int):
     current = topic_names[current_topic]
     prev_disabled = current_topic == 0
     next_disabled = current_topic == n_topics - 1
-    prev_topic = "" if prev_disabled else "<- " + topic_names[current_topic - 1]
-    next_topic = "" if next_disabled else topic_names[current_topic + 1] + " ->"
+    prev_topic = (
+        "" if prev_disabled else "<- " + topic_names[current_topic - 1]
+    )
+    next_topic = (
+        "" if next_disabled else topic_names[current_topic + 1] + " ->"
+    )
     return next_topic, next_disabled, prev_topic, prev_disabled, current

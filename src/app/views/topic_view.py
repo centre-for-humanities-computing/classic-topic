@@ -1,16 +1,14 @@
 from typing import Dict, List
 
-import plotly.graph_objects as go
-from dash_extensions.enrich import dcc, html
 import pandas as pd
+import plotly.graph_objects as go
 from dash import ctx
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import dcc, html
-from dash_extensions.enrich import Input, Output, State
+from dash_extensions.enrich import Input, Output, State, dcc, html
 
 from app.utils.callback import init_callbacks
 from app.utils.modelling import calculate_top_words
-from app.utils.plots import topic_plot, all_topics_plot
+from app.utils.plots import all_topics_plot, topic_plot
 
 callbacks, def_callback = init_callbacks()
 
@@ -56,7 +54,9 @@ def update_current_topic_plot(
         current_topic=current_topic, top_n=30, alpha=alpha, **fit_store
     )
     genre_importance = pd.DataFrame(fit_store["genre_importance"])
-    genre_importance = genre_importance[genre_importance.topic == current_topic]
+    genre_importance = genre_importance[
+        genre_importance.topic == current_topic
+    ]
     return topic_plot(top_words=top_words, genre_importance=genre_importance)
 
 
@@ -130,5 +130,10 @@ def update_all_topics_plot(
     # method
     names = pd.Series(topic_names)
     topic_data = topic_data.assign(topic_name=topic_data.topic_id.map(names))
-    fig = all_topics_plot(topic_data, current_topic)
+    print(f"{topic_data=}")
+    try:
+        fig = all_topics_plot(topic_data, current_topic)
+    except ValueError as e:
+        print(f"Failed to plot topics, error: {e}")
+        raise PreventUpdate
     return fig

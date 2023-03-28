@@ -1,6 +1,7 @@
 """Describes the app layout and callbacks"""
 import base64
 import json
+from numbers import Integral
 from typing import Dict, List, Tuple
 
 import pandas as pd
@@ -59,6 +60,49 @@ layout = html.Div(
 
 
 @def_callback(
+    Output("fit_pipeline", "className"),
+    Output("fit_pipeline", "disabled"),
+    Output("fit_pipeline", "title"),
+    Input("min_df", "value"),
+    Input("max_df", "value"),
+    Input("genre_weights", "data"),
+)
+def enable_disable_fit_button(
+    min_df: int, max_df: float, genre_weights: Dict[str, int]
+) -> Tuple[str, bool, str]:
+    """Disables button when max_df and min_df are inappropriate"""
+    enabled_style = """
+        basis-2/3
+        text-white bg-green-600
+        hover:bg-green-700
+        h-12 flex-1 text-center 
+        transition-all ease-in
+        rounded-xl shadow
+    """
+    disabled_style = """
+        basis-2/3
+        text-black bg-gray-600
+        h-12 flex-1 text-center 
+        transition-all ease-in
+        rounded-xl shadow
+    """
+    max_df = float(max_df)
+    weighted_corpus = prepare_corpus(corpus, genre_weights)
+    n_doc = len(weighted_corpus.index)
+    max_doc_count = max_df if isinstance(max_df, Integral) else max_df * n_doc
+    min_doc_count = min_df if isinstance(min_df, Integral) else min_df * n_doc
+    if max_doc_count < min_doc_count:
+        alt_message = f"""
+        Maximum number of documents({max_doc_count})
+        is smaller Than minimum number of documents({min_doc_count}).
+        Either increase max_df or lower min_df.
+        """
+        return disabled_style, True, alt_message
+    else:
+        return enabled_style, False, "Fit topic model"
+
+
+@def_callback(
     ServersideOutput("fit_store", "data"),
     Output("loading", "children"),
     Input("fit_pipeline", "n_clicks"),
@@ -86,7 +130,16 @@ def update_fit(
     """Updates fit data in the local store when the fit model button
     is pressed.
     """
+    max_df = float(max_df)
     print("Updating fit")
+    print(f"\t{n_clicks=}")
+    print(f"\t{vectorizer_name=}")
+    print(f"\t{min_df=}")
+    print(f"\t{max_df=}")
+    print(f"\t{model_name=}")
+    print(f"\t{n_topics=}")
+    print(f"\t{genre_weights=}")
+    print(f"\t{n_gram_range=}")
     if ctx.triggered_id == "upload":
         if not upload_contents:
             raise PreventUpdate()
@@ -100,12 +153,11 @@ def update_fit(
     # If the button has not actually been clicked prevent updating
     if not n_clicks or not genre_weights:
         raise PreventUpdate
-    print(genre_weights)
-    corpus_ = prepare_corpus(corpus, genre_weights)
+    weighted_corpus = prepare_corpus(corpus, genre_weights)
     # Fitting the topic pipeline
     n_gram_low, n_gram_high, *_ = n_gram_range
     pipeline = fit_pipeline(
-        corpus=corpus_,
+        corpus=weighted_corpus,
         vectorizer_name=vectorizer_name,
         min_df=min_df,
         max_df=max_df,
@@ -114,15 +166,17 @@ def update_fit(
         n_gram_range=(n_gram_low, n_gram_high),
     )
     # Inferring data from the fit
-    genre_importance = calculate_genre_importance(corpus_, pipeline)
-    pipeline_data = prepare_pipeline_data(
-        pipeline.vectorizer, pipeline.topic_model
-    )
+    genre_importance = calculate_genre_importance(weighted_corpus, pipeline)
+    vectorizer = pipeline.named_steps["vectorizer"]
+    topic_model = pipeline.named_steps["topic_model"]
+    pipeline_data = prepare_pipeline_data(vectorizer, topic_model)
     transformed_data = prepare_transformed_data(
-        pipeline.vectorizer, pipeline.topic_model, texts=corpus_.text
+        vectorizer, topic_model, texts=weighted_corpus.text
     )
     topic_data = prepare_topic_data(**transformed_data, **pipeline_data)
-    document_data = prepare_document_data(corpus=corpus_, **transformed_data)
+    document_data = prepare_document_data(
+        corpus=weighted_corpus, **transformed_data
+    )
     pipeline_data.pop("components")
     fit_data = {
         "genre_importance": genre_importance.to_dict(),

@@ -5,14 +5,12 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import scipy.sparse as spr
 from sklearn.decomposition import NMF, LatentDirichletAllocation, TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.manifold import TSNE
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import normalize
-from tweetopic import DMM, TopicPipeline
 
 from app.utils.metadata import fetch_metadata
 
@@ -22,7 +20,6 @@ TOPIC_MODELS = {
     "lda": LatentDirichletAllocation,
     "lsa": TruncatedSVD,
     "lsi": TruncatedSVD,
-    "dmm": DMM,
 }
 
 # Mapping of names to vectorizers
@@ -82,7 +79,7 @@ def fit_pipeline(
     model_name: str,
     n_topics: int,
     n_gram_range: Tuple[int, int],
-) -> TopicPipeline:
+) -> Pipeline:
     """Fits topic pipeline with the given parameters.
 
     Parameters
@@ -115,7 +112,9 @@ def fit_pipeline(
         ngram_range=n_gram_range,
         max_features=MAX_FEATURES,
     )
-    pipeline = TopicPipeline(vectorizer=vectorizer, topic_model=topic_model)
+    pipeline = Pipeline(
+        [("vectorizer", vectorizer), ("topic_model", topic_model)]
+    )
     # Fitting the pipeline
     pipeline = pipeline.fit(corpus.text)
     return pipeline
@@ -134,7 +133,7 @@ def topic_document_importance(
 
 
 def calculate_genre_importance(
-    corpus: pd.DataFrame, pipeline: TopicPipeline
+    corpus: pd.DataFrame, pipeline: Pipeline
 ) -> pd.DataFrame:
     """Calculates for which groups in the corpus are the
     given topics specifically important.

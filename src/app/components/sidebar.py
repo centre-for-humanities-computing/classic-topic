@@ -1,9 +1,8 @@
-from typing import Tuple, Dict
+from typing import Dict, Tuple
 
 from dash import ctx
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import dcc, html
-from dash_extensions.enrich import Input, Output, State
+from dash_extensions.enrich import Input, Output, State, dcc, html
 
 from app.components import accordion
 from app.components.toolbar import toolbar_class
@@ -73,7 +72,7 @@ feature_extraction = accordion.Accordion(
                 id="min_df",
                 min=0,
                 max=50,
-                step=1,
+                step=1.0,
                 value=0,
                 marks={i * 10: str(i * 10) for i in range(6)},
                 tooltip={"placement": "bottom", "always_visible": True},
@@ -108,8 +107,6 @@ topic_model = accordion.Accordion(
                     options={
                         "nmf": "Non-negative Matrix Factorization",
                         "lda": "Latent Dirichlet Allocation",
-                        "lsa": "Latent Semantic Allocation/Indexing",
-                        "dmm": "Dirichlet Multinomial Mixture",
                     },
                     value="nmf",
                 ),
@@ -217,9 +214,13 @@ sidebar = layout
     Input("current_view", "data"),
     prevent_initial_call=True,
 )
-def open_close_sidebar(n_clicks: int, current_view: str) -> Tuple[str, str, str]:
+def open_close_sidebar(
+    n_clicks: int, current_view: str
+) -> Tuple[str, str, str]:
     """Opens or closes sidebar and moves and hides the topic switcher."""
-    hide_switcher = " translate-y-0" if current_view == "topic" else " translate-y-full"
+    hide_switcher = (
+        " translate-y-0" if current_view == "topic" else " translate-y-full"
+    )
     is_open = (n_clicks % 2) == 0
 
     if is_open:

@@ -73,7 +73,6 @@ def all_topics_plot(topic_data: pd.DataFrame, current_topic: int) -> go.Figure:
         topic_data["topic_id"] == current_topic, 1, 0
     )
     topic_data["size"] = topic_data["size"] / topic_data["size"].max()
-    print(topic_data)
     fig = px.scatter(
         topic_data,
         x="x",
